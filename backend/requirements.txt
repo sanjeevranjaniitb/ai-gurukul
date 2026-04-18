@@ -1,0 +1,29 @@
+# Web framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# PDF parsing
+PyMuPDF>=1.23.0
+
+# RAG pipeline
+langchain>=0.1.0
+langchain-text-splitters>=0.0.1
+tiktoken>=0.5.0
+sentence-transformers>=2.2.0
+chromadb>=0.4.0
+
+# TTS
+piper-tts>=1.2.0
+
+# Evaluation
+ragas>=0.1.0
+
+# Avatar / face detection
+opencv-python-headless>=4.8.0
+
+# Utilities
+pyyaml>=6.0
+pydantic>=2.0.0
+httpx>=0.25.0
+numpy>=1.24.0

@@ -1,0 +1,41 @@
+[
+  {
+    "question": "What is retrieval augmented generation?",
+    "answer": "Retrieval Augmented Generation (RAG) is a technique that combines information retrieval with text generation. It retrieves relevant documents from a knowledge base and uses them as context for a language model to generate grounded answers.",
+    "context": [
+      "Retrieval Augmented Generation (RAG) is a method that enhances language model outputs by first retrieving relevant passages from a document store, then conditioning the generation on those passages.",
+      "RAG systems typically use vector embeddings to find semantically similar documents and pass them as context to the language model."
+    ]
+  },
+  {
+    "question": "How does chunking work in a RAG pipeline?",
+    "answer": "Chunking splits large documents into smaller segments, typically 512 tokens with overlap, so that each segment can be independently embedded and retrieved during semantic search.",
+    "context": [
+      "Document chunking is the process of dividing text into smaller, manageable pieces. Common strategies include fixed-size chunking with overlap, where each chunk contains a set number of tokens and overlaps with adjacent chunks to preserve context.",
+      "In RAG pipelines, chunks are embedded into vector representations and stored in a vector database for efficient similarity search."
+    ]
+  },
+  {
+    "question": "What embedding model is used for semantic search?",
+    "answer": "The system uses the all-MiniLM-L6-v2 model which produces 384-dimensional embeddings optimized for semantic similarity tasks.",
+    "context": [
+      "all-MiniLM-L6-v2 is a sentence-transformers model that maps sentences to a 384-dimensional dense vector space. It is optimized for semantic search and clustering tasks.",
+      "The model is approximately 80 MB in size and runs efficiently on CPU, making it suitable for edge device deployment."
+    ]
+  },
+  {
+    "question": "What is the maximum PDF file size allowed?",
+    "answer": "The maximum allowed PDF file size is 50 MB. Files exceeding this limit will be rejected with an error message.",
+    "context": [
+      "The system enforces a 50 MB file size limit for uploaded PDF documents. If a file exceeds this limit, the interface displays an error message indicating the size restriction."
+    ]
+  },
+  {
+    "question": "How does the avatar generate lip movements?",
+    "answer": "The avatar uses SadTalker, a talking head generation model that takes a static image and audio input to produce video with synchronized lip movements and natural head motion.",
+    "context": [
+      "SadTalker is a CVPR 2023 model for single-image talking head generation. It uses 3D Morphable Model (3DMM) coefficients to drive facial animation from audio input.",
+      "The model generates lip-synced video at 25 FPS with natural head movements and eye blinks, creating a realistic talking head effect from a single photograph."
+    ]
+  }
+]

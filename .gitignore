@@ -1,0 +1,172 @@
+# ==============================================================================
+# AI Gurukul — Enterprise .gitignore
+# ==============================================================================
+
+# ==============================================================================
+# Python
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg
+*.egg-info/
+.eggs/
+*.manifest
+*.spec
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Distribution / packaging
+build/
+develop-eggs/
+sdist/
+wheels/
+*.whl
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+.python-version
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+.pyre/
+
+# Testing / coverage
+.pytest_cache/
+.tox/
+.nox/
+htmlcov/
+.coverage
+.coverage.*
+coverage.xml
+*.cover
+*.py,cover
+nosetests.xml
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ==============================================================================
+# Node.js / Frontend
+# ==============================================================================
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/dist-ssr/
+*.local
+.eslintcache
+.parcel-cache/
+
+# ==============================================================================
+# IDE / Editor
+# ==============================================================================
+.vscode/
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*.swn
+*~
+*.sublime-project
+*.sublime-workspace
+.project
+.classpath
+.settings/
+
+# ==============================================================================
+# OS
+# ==============================================================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# ==============================================================================
+# AI Model Weights (large binaries — downloaded by scripts/setup_models.sh)
+# ==============================================================================
+models/piper/*.onnx
+models/piper/*.onnx.json
+models/wav2lip/
+models/sadtalker/
+gfpgan/
+
+# Keep directory structure via .gitkeep files
+!models/.gitkeep
+!models/piper/.gitkeep
+!models/sadtalker/.gitkeep
+
+# ==============================================================================
+# Runtime Data (generated at runtime, not source code)
+# ==============================================================================
+data/chroma/*.sqlite3
+data/chroma/*/
+data/media/
+data/avatars/*/
+data/documents/*/
+
+# Keep directory structure
+!data/.gitkeep
+!data/chroma/.gitkeep
+!data/avatars/.gitkeep
+!data/documents/.gitkeep
+!data/**/.gitkeep
+
+# Temp files
+temp/
+
+# ==============================================================================
+# Docker
+# ==============================================================================
+ollama_data/
+
+# ==============================================================================
+# Secrets / Credentials (NEVER commit these)
+# ==============================================================================
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+credentials.json
+service-account*.json
+*secret*
+!*secret*.py
+!*secret*.ts
+!*secret*.js
+
+# ==============================================================================
+# Logs
+# ==============================================================================
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==============================================================================
+# Misc
+# ==============================================================================
+*.bak
+*.tmp
+*.temp
+*.orig
+*.rej

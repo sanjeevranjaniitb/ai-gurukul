@@ -1,0 +1,46 @@
+export interface AvatarUploadResponse {
+  avatar_id: string;
+  preview_url: string;
+  landmarks_ready: boolean;
+}
+
+export interface PdfUploadResponse {
+  document_id: string;
+  name: string;
+  page_count: number;
+  chunk_count: number;
+}
+
+export interface HealthResponse {
+  status: string;
+  models_loaded: boolean;
+  memory_usage_mb: number;
+}
+
+export async function uploadAvatar(file: File): Promise<AvatarUploadResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch('/api/upload/avatar', { method: 'POST', body: form });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || 'Avatar upload failed');
+  }
+  return res.json();
+}
+
+export async function uploadPdf(file: File): Promise<PdfUploadResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await fetch('/api/upload/pdf', { method: 'POST', body: form });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(err.detail || 'PDF upload failed');
+  }
+  return res.json();
+}
+
+export async function checkHealth(): Promise<HealthResponse> {
+  const res = await fetch('/api/health');
+  if (!res.ok) throw new Error('Health check failed');
+  return res.json();
+}

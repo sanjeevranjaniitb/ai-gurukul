@@ -1,0 +1,37 @@
+# Live Talking Head Avatar — Application Configuration
+# All values below match the built-in defaults.
+# Override any setting by changing its value here.
+
+# RAG settings
+chunk_size: 512
+chunk_overlap: 50
+retrieval_top_k: 5
+embedding_model: "all-MiniLM-L6-v2"
+
+# LLM settings
+llm_model: "llama3.2:3b"
+llm_base_url: "http://localhost:11434"
+llm_temperature: 0.1
+llm_max_tokens: 512
+
+# TTS settings
+tts_model_path: "./models/piper/en_US-lessac-medium.onnx"
+tts_sample_rate: 22050
+
+# Avatar settings
+avatar_checkpoint_dir: "./models/sadtalker/"
+avatar_fps: 25
+avatar_resolution: [256, 256]
+
+# Storage
+chroma_persist_dir: "./data/chroma"
+media_output_dir: "./data/media"
+
+# Validation limits
+max_image_size_mb: 10
+max_pdf_size_mb: 50
+min_image_resolution: [256, 256]
+allowed_image_formats:
+  - "png"
+  - "jpg"
+  - "jpeg"
