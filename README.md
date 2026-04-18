@@ -40,29 +40,29 @@ Everything streams in real time — you see text tokens appear, hear audio play,
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                        Browser (React)                          │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
-│  │  Upload   │  │   Chat   │  │  Avatar  │  │  Processing   │  │
-│  │  Panel    │  │  History  │  │  Player  │  │  Indicators   │  │
-│  └──────────┘  └──────────┘  └──────────┘  └───────────────┘  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────────┐    │
+│  │  Upload  │  │   Chat   │  │  Avatar  │  │  Processing   │    │
+│  │  Panel   │  │  History │  │  Player  │  │  Indicators   │    │
+│  └──────────┘  └──────────┘  └──────────┘  └───────────────┘    │
 └────────────────────────┬────────────────────────────────────────┘
                          │ SSE (Server-Sent Events)
                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                     FastAPI Backend                              │
+│                     FastAPI Backend                             │
 │                                                                 │
 │  ┌─────────────────── Orchestrator ──────────────────────────┐  │
 │  │                                                           │  │
 │  │  Question ──► Retrieve ──► Stream LLM ──► TTS ──► Animate │  │
-│  │              (ChromaDB)    (Ollama)      (Piper)  (Wav2Lip)│  │
+│  │              (ChromaDB)    (Ollama)      (Piper) (Wav2Lip)│  │
 │  │                                                           │  │
 │  │  Each sentence is pipelined: while sentence N animates,   │  │
 │  │  sentence N+1 is being synthesized, and N+2 is streaming  │  │
 │  └───────────────────────────────────────────────────────────┘  │
 │                                                                 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐   │
-│  │PDF Parser│  │Embedding │  │   RAG    │  │  Evaluation  │   │
-│  │(PyMuPDF) │  │  Store   │  │ Pipeline │  │   (RAGAS)    │   │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────────┘   │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐     │
+│  │PDF Parser│  │Embedding │  │   RAG    │  │  Evaluation  │     │
+│  │(PyMuPDF) │  │  Store   │  │ Pipeline │  │   (RAGAS)    │     │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────────┘     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 

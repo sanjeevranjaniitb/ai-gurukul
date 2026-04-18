@@ -6,7 +6,7 @@ This plan implements an end-to-end conversational AI system that transforms a st
 
 ## Tasks
 
-- [ ] 1. Set up project structure, configuration, and shared data models
+- [x] 1. Set up project structure, configuration, and shared data models
   - [x] 1.1 Create the monorepo directory structure with `backend/` (Python/FastAPI) and `frontend/` (React + TypeScript + Vite) directories, plus `data/`, `models/`, and `config/` folders matching the design file storage layout
     - Initialize Python project with `pyproject.toml333223` or `requirements.txt` including FastAPI, uvicorn, PyMuPDF, langchain, sentence-transformers, chromadb, piper-tts, and RAGAS
     - Initialize React + TypeScript project with Vite in `frontend/`
@@ -25,7 +25,7 @@ This plan implements an end-to-end conversational AI system that transforms a st
     - Configure Python structured logging (JSON format) with timestamps, component identifiers, and request correlation IDs
     - _Requirements: 9.1_
 
-- [ ] 2. Implement PDF parsing and chunking pipeline
+- [x] 2. Implement PDF parsing and chunking pipeline
   - [x] 2.1 Implement `PDFParser` class using PyMuPDF
     - Extract text from all pages, preserve table structure as markdown-formatted text
     - Validate file is not corrupted or password-protected; raise `PDFParseError` with descriptive messages
@@ -41,7 +41,7 @@ This plan implements an end-to-end conversational AI system that transforms a st
     - Test text extraction, table preservation, error handling for corrupted/password-protected PDFs, chunk size and overlap correctness
     - _Requirements: 2.1, 2.2, 2.3, 2.4, 9.3_
 
-- [ ] 3. Implement embedding service and vector store
+- [x] 3. Implement embedding service and vector store
   - [x] 3.1 Implement `EmbeddingStore` class using sentence-transformers and ChromaDB
     - Load `all-MiniLM-L6-v2` model (384-dimensional embeddings)
     - Implement `add_chunks()` to embed and store `DocumentChunk` objects in ChromaDB persistent collection
@@ -52,7 +52,7 @@ This plan implements an end-to-end conversational AI system that transforms a st
     - Test chunk storage, retrieval ranking, and empty-store edge case
     - _Requirements: 2.5, 3.1, 9.3_
 
-- [ ] 4. Implement LLM service and RAG pipeline
+- [x] 4. Implement LLM service and RAG pipeline
   - [x] 4.1 Implement `LLMService` class wrapping Ollama HTTP API
     - Connect to Ollama at configurable base URL, use `llama3.2:3b` model
     - Build prompt template that includes retrieved context chunks and the user question
@@ -66,14 +66,14 @@ This plan implements an end-to-end conversational AI system that transforms a st
     - When no relevant context is found (all scores below threshold), return a "no relevant information" message
     - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-  - [ ]* 4.3 Write unit tests for `LLMService` and `RAGPipeline`
+  - [x]* 4.3 Write unit tests for `LLMService` and `RAGPipeline`
     - Mock Ollama responses; test prompt construction, no-context fallback, error handling
     - _Requirements: 3.2, 3.3, 3.4, 3.5, 9.3_
 
 - [x] 5. Checkpoint
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 6. Implement TTS engine
+- [x] 6. Implement TTS engine
   - [x] 6.1 Implement `TTSEngine` class using Piper TTS
     - Load Piper ONNX model from configurable path
     - Implement `synthesize()` to convert text to WAV audio at ≥22050 Hz sample rate
@@ -81,11 +81,11 @@ This plan implements an end-to-end conversational AI system that transforms a st
     - Handle unsupported characters by skipping them and continuing
     - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 10.2_
 
-  - [ ]* 6.2 Write unit tests for `TTSEngine`
+  - [x]* 6.2 Write unit tests for `TTSEngine`
     - Test WAV output format, sample rate, and unsupported character handling
     - _Requirements: 4.1, 4.2, 4.5, 9.3_
 
-- [ ] 7. Implement avatar engine
+- [x] 7. Implement avatar engine
   - [x] 7.1 Implement `AvatarEngine` class using SadTalker
     - Implement `preprocess()` to validate image (PNG/JPG/JPEG, ≥256×256, ≤10 MB), detect face, extract facial landmarks; raise `FaceNotFoundError` if no face detected
     - Implement `animate()` to generate lip-synced MP4 video at ≥25 FPS from avatar profile and audio
@@ -93,11 +93,11 @@ This plan implements an end-to-end conversational AI system that transforms a st
     - On frame generation failure, log error and substitute static avatar image for the failed segment
     - _Requirements: 1.1, 1.2, 1.3, 1.5, 1.6, 5.1, 5.2, 5.3, 5.4, 5.5, 5.6, 10.3_
 
-  - [ ]* 7.2 Write unit tests for `AvatarEngine`
+  - [x]* 7.2 Write unit tests for `AvatarEngine`
     - Test image validation, face detection error, video output properties (FPS, format), fallback on failure
     - _Requirements: 1.1, 1.2, 1.3, 1.5, 5.1, 5.3, 5.6, 9.3_
 
-- [ ] 8. Implement the Orchestrator and FastAPI endpoints
+- [x] 8. Implement the Orchestrator and FastAPI endpoints
   - [x] 8.1 Implement the `Orchestrator` class
     - Wire the streaming pipeline: retrieve → stream generate → chunked synthesize → chunked animate
     - Implement `process_question_stream()` as an async generator that yields `StreamEvent` objects (text_token, audio_chunk, video_chunk, stage_update, done)
@@ -116,14 +116,14 @@ This plan implements an end-to-end conversational AI system that transforms a st
     - Serve generated media files (audio chunks, video segments) as static assets
     - _Requirements: 1.4, 2.7, 6.1, 6.2, 9.6, 10.4, 10.7_
 
-  - [ ]* 8.3 Write unit tests for the Orchestrator
+  - [x]* 8.3 Write unit tests for the Orchestrator
     - Mock all sub-components; test full pipeline flow, error propagation, and structured logging output
     - _Requirements: 9.1, 9.2, 9.3_
 
 - [x] 9. Checkpoint
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 10. Implement the React frontend (Chat_Interface)
+- [x] 10. Implement the React frontend (Chat_Interface)
   - [x] 10.1 Create the main application layout and routing
     - Set up React + TypeScript app with Vite
     - Create responsive layout shell (320px–1920px) with avatar display area, chat area, and file upload area
@@ -151,11 +151,11 @@ This plan implements an end-to-end conversational AI system that transforms a st
     - Loading indicator showing current processing stage (retrieving, generating, synthesizing, animating) updated in real time from SSE stage events
     - _Requirements: 6.3, 6.5, 10.6_
 
-  - [ ]* 10.6 Write unit tests for frontend components
+  - [x]* 10.6 Write unit tests for frontend components
     - Test upload validation, API call integration, chat history rendering, and responsive layout
     - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
 
-- [ ] 11. Implement RAG evaluation module
+- [x] 11. Implement RAG evaluation module
   - [x] 11.1 Implement `EvaluationModule` class using RAGAS
     - Implement `evaluate_single()` computing faithfulness, context_relevance, and answer_relevance scores
     - Implement `evaluate_dataset()` to run evaluation against a configurable JSON test dataset
@@ -168,14 +168,14 @@ This plan implements an end-to-end conversational AI system that transforms a st
     - Include a sample `test_dataset.json` with example question-answer pairs
     - _Requirements: 8.6_
 
-  - [ ]* 11.3 Write unit tests for `EvaluationModule`
+  - [x]* 11.3 Write unit tests for `EvaluationModule`
     - Mock RAGAS scoring; test JSON output format, dataset loading, and metric computation
     - _Requirements: 8.1, 8.2, 8.3, 8.4, 9.3_
 
 - [x] 12. Checkpoint
   - Ensure all tests pass, ask the user if questions arise.
 
-- [ ] 13. Docker deployment and edge optimization
+- [x] 13. Docker deployment and edge optimization
   - [x] 13.1 Create Dockerfiles and docker-compose configuration
     - Multi-stage Dockerfile for the Python backend (slim base image, install dependencies, copy code)
     - Dockerfile for the React frontend (build stage + nginx serve stage)
@@ -191,7 +191,7 @@ This plan implements an end-to-end conversational AI system that transforms a st
     - Document minimum hardware requirements (8 GB RAM, 4-core CPU)
     - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
-- [ ] 14. Open-source compliance and API documentation
+- [x] 14. Open-source compliance and API documentation
   - [x] 14.1 Create dependency manifest and license documentation
     - Generate a `LICENSES.md` or `dependencies.json` listing all models and libraries with their license identifiers (Apache 2.0, MIT, BSD, Llama Community License)
     - Verify no paid API keys or cloud services are required for core functionality
@@ -202,8 +202,8 @@ This plan implements an end-to-end conversational AI system that transforms a st
     - Add docstrings and descriptions to all endpoint definitions
     - _Requirements: 9.6_
 
-- [ ] 15. Integration tests and final wiring
-  - [ ]* 15.1 Write integration tests for the end-to-end flow
+- [x] 15. Integration tests and final wiring
+  - [x]* 15.1 Write integration tests for the end-to-end flow
     - Test the full pipeline from question submission through to avatar video generation (mocking heavy AI models where needed)
     - Verify PDF upload → chunking → embedding → retrieval → generation → TTS → animation → response delivery
     - _Requirements: 9.4_
