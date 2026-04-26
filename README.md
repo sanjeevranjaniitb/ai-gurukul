@@ -9,6 +9,7 @@
   The avatar reads your documents, speaks the answer, and moves its lips — all running locally on your machine.
 </p>
 
+![alt text](image.png)
 <p align="center">
   <img src="https://img.shields.io/badge/python-3.10-blue?logo=python&logoColor=white" alt="Python" />
   <img src="https://img.shields.io/badge/react-19-61DAFB?logo=react&logoColor=white" alt="React" />
