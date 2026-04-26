@@ -74,29 +74,29 @@ AI Gurukul offers two avatar animation modes, selectable via a dropdown in the U
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Browser (React + Canvas)                    │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
-│  │ Sidebar  │  │  Canvas  │  │   Chat   │  │  Processing   │  │
-│  │ (upload) │  │ (avatar) │  │ (stream) │  │  Indicators   │  │
-│  └──────────┘  └──────────┘  └──────────┘  └───────────────┘  │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────────┐    │
+│  │ Sidebar  │  │  Canvas  │  │   Chat   │  │  Processing   │    │
+│  │ (upload) │  │ (avatar) │  │ (stream) │  │  Indicators   │    │
+│  └──────────┘  └──────────┘  └──────────┘  └───────────────┘    │
 └────────────────────────┬────────────────────────────────────────┘
                          │ SSE (Server-Sent Events)
                          ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│                     FastAPI Backend                              │
+│                     FastAPI Backend                             │
 │                                                                 │
 │  ┌─────────────────── Orchestrator ──────────────────────────┐  │
 │  │                                                           │  │
 │  │  Animated: Retrieve → Stream LLM → Edge-TTS per sentence  │  │
-│  │            → viseme images (base64) → canvas animation     │  │
+│  │            → viseme images (base64) → canvas animation    │  │
 │  │                                                           │  │
 │  │  Real:     Retrieve → Stream LLM → Edge-TTS full answer   │  │
-│  │            → Wav2Lip video → play in browser               │  │
+│  │            → Wav2Lip video → play in browser              │  │
 │  └───────────────────────────────────────────────────────────┘  │
 │                                                                 │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐   │
-│  │PDF Parser│  │Embedding │  │  Viseme  │  │  Evaluation  │   │
-│  │(PyMuPDF) │  │  Store   │  │  Engine  │  │   (RAGAS)    │   │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────────┘   │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────┐     │
+│  │PDF Parser│  │Embedding │  │  Viseme  │  │  Evaluation  │     │
+│  │(PyMuPDF) │  │  Store   │  │  Engine  │  │   (RAGAS)    │     │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────────┘     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
