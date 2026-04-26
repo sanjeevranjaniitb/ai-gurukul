@@ -13,7 +13,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-
+ 
 import cv2
 import numpy as np
 
@@ -149,45 +149,30 @@ class AvatarEngine:
     def _run_wav2lip(
         self, profile: AvatarProfile, audio_path: str, output_path: str,
     ) -> VideoResult:
-        """Run Wav2Lip inference or fall back to static video."""
+        """Run Wav2Lip inference. No fallback — raises on failure."""
         start = time.monotonic()
         out = Path(output_path)
         out.parent.mkdir(parents=True, exist_ok=True)
 
         inference_script = self._wav2lip_dir / "inference.py"
 
-        try:
-            if inference_script.is_file() and self._checkpoint.is_file():
-                self._invoke_wav2lip(
-                    image_path=profile.image_path,
-                    audio_path=str(Path(audio_path).resolve()),
-                    output_path=str(out.resolve()),
-                )
-            else:
-                missing = []
-                if not inference_script.is_file():
-                    missing.append(f"inference.py at {inference_script}")
-                if not self._checkpoint.is_file():
-                    missing.append(f"checkpoint at {self._checkpoint}")
-                logger.warning(
-                    "Wav2Lip not available (%s) – generating static fallback",
-                    ", ".join(missing),
-                )
-                self._generate_fallback_video(
-                    profile.image_path, audio_path, str(out),
-                )
-        except Exception:
-            logger.exception(
-                "Wav2Lip failed for avatar %s – substituting static fallback",
-                profile.avatar_id,
-            )
-            self._generate_fallback_video(
-                profile.image_path, audio_path, str(out),
-            )
+        if not inference_script.is_file():
+            raise RuntimeError(f"Wav2Lip inference.py not found at {inference_script}")
+        if not self._checkpoint.is_file():
+            raise RuntimeError(f"Wav2Lip checkpoint not found at {self._checkpoint}")
+
+        self._invoke_wav2lip(
+            image_path=profile.image_path,
+            audio_path=str(Path(audio_path).resolve()),
+            output_path=str(out.resolve()),
+        )
+
+        if not out.is_file():
+            raise RuntimeError(f"Wav2Lip did not produce output at {output_path}")
 
         elapsed = time.monotonic() - start
         duration = self._probe_duration(str(out))
-        logger.info("Animation completed in %.1fs, video duration %.2fs", elapsed, duration)
+        logger.info("Wav2Lip completed in %.1fs, video duration %.2fs", elapsed, duration)
 
         return VideoResult(
             file_path=str(out),
@@ -200,30 +185,47 @@ class AvatarEngine:
     def _invoke_wav2lip(
         self, image_path: str, audio_path: str, output_path: str,
     ) -> None:
-        """Call Wav2Lip inference.py as a subprocess."""
+        """Call Wav2Lip inference.py as a subprocess.
+
+        Passes the full avatar frame (not a tiny crop) so the output
+        includes the complete face with background at good resolution.
+        Uses --static True for single-image input.
+        """
         wav2lip_dir = str(self._wav2lip_dir.resolve())
         env = os.environ.copy()
         env["PYTHONPATH"] = wav2lip_dir + ":" + env.get("PYTHONPATH", "")
+        env["OMP_NUM_THREADS"] = "2"
+
+        # Use the preprocessed frame if available (512×512, face-centered)
+        # Otherwise use the original image
+        face_input = image_path
+
+        # Check if a preprocessed frame exists for this avatar
+        avatar_dir = Path(image_path).parent
+        frame_path = avatar_dir / "frame.jpg"
+        if frame_path.is_file():
+            face_input = str(frame_path)
 
         cmd = [
             self._python,
             str(self._wav2lip_dir / "inference.py"),
             "--checkpoint_path", str(self._checkpoint.resolve()),
-            "--face", image_path,
+            "--face", face_input,
             "--audio", audio_path,
             "--outfile", output_path,
             "--static", "True",
-            "--fps", str(self.fps),
             "--resize_factor", "2",
-            "--wav2lip_batch_size", "16",
             "--nosmooth",
+            "--wav2lip_batch_size", "16",
         ]
         logger.info("Running Wav2Lip: %s", " ".join(cmd))
         result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=120,
+            cmd, capture_output=True, text=True, timeout=300,
             cwd=str(_PROJECT_ROOT), env=env,
         )
+
         if result.returncode != 0:
+            logger.error("Wav2Lip stderr: %s", result.stderr[:1000])
             raise RuntimeError(
                 f"Wav2Lip exited with code {result.returncode}: "
                 f"{result.stderr[:500]}"

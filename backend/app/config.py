@@ -24,7 +24,7 @@ class AppConfig:
     llm_model: str = "llama3.2:3b"
     llm_base_url: str = "http://localhost:11434"
     llm_temperature: float = 0.1
-    llm_max_tokens: int = 512
+    llm_max_tokens: int = 150
 
     # TTS settings
     tts_model_path: str = "./models/piper/en_US-lessac-medium.onnx"

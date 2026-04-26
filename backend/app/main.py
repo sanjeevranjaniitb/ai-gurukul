@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import uuid
 from pathlib import Path
 
@@ -19,14 +20,9 @@ from backend.app.logging_utils import get_logger, set_correlation_id
 logger = get_logger("api")
 
 app = FastAPI(
-    title="Live Talking Head Avatar",
-    description=(
-        "Conversational AI system that transforms a static photograph into an "
-        "animated talking head avatar. Combines RAG-based question answering over "
-        "uploaded PDF documents with text-to-speech synthesis and facial animation. "
-        "All AI models run locally on edge devices."
-    ),
-    version="0.1.0",
+    title="AI Gurukul",
+    description="Conversational AI avatar that answers questions from your PDF documents.",
+    version="0.2.0",
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -76,6 +72,7 @@ class AskRequest(BaseModel):
     """JSON body for the /api/ask endpoint."""
     question: str
     avatar_id: str
+    mode: str = "animated"  # "animated" (viseme) or "real" (Wav2Lip video)
 
 
 # ---------------------------------------------------------------------------
@@ -133,11 +130,15 @@ async def upload_avatar(file: UploadFile = File(..., description="Avatar image f
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     preview_url = f"/api/data/avatars/{avatar_id}/original.{ext}"
-    logger.info("upload_avatar success, avatar_id=%s", avatar_id)
+    viseme_urls = orchestrator.get_viseme_urls(avatar_id)
+    frame_url = orchestrator.get_frame_url(avatar_id)
+    logger.info("upload_avatar success, avatar_id=%s, visemes=%d", avatar_id, len(viseme_urls))
     return {
         "avatar_id": avatar_id,
-        "preview_url": preview_url,
+        "preview_url": frame_url or preview_url,
         "landmarks_ready": True,
+        "visemes": viseme_urls,
+        "frame_url": frame_url,
     }
 
 
@@ -217,7 +218,7 @@ async def ask(body: AskRequest):
     async def _event_generator():
         try:
             async for event in orchestrator.process_question_stream(
-                body.question, body.avatar_id
+                body.question, body.avatar_id, mode=body.mode
             ):
                 payload = json.dumps(event.data, default=str)
                 yield f"event: {event.type}\ndata: {payload}\n\n"
@@ -283,3 +284,59 @@ async def health_check():
         "models_loaded": models_loaded,
         "memory_usage_mb": round(_memory_usage_mb(), 1),
     }
+
+
+@app.post(
+    "/api/reset",
+    summary="Reset session",
+    tags=["System"],
+    response_description="Clears all session data (avatars, media, documents)",
+)
+async def reset_session():
+    """Clear all session data — avatars, media files, uploaded documents.
+
+    Call this when starting a new session or when the browser tab closes.
+    """
+    import shutil
+
+    global _orchestrator
+
+    # Reset orchestrator state
+    if _orchestrator is not None:
+        _orchestrator._avatars.clear()
+        _orchestrator._avatar_visemes.clear()
+        _orchestrator._avatar_frames.clear()
+
+    # Clean media files
+    media_dir = Path(_config.media_output_dir)
+    if media_dir.exists():
+        for item in media_dir.iterdir():
+            if item.is_dir():
+                shutil.rmtree(item, ignore_errors=True)
+
+    # Clean avatar visemes and frames (keep original uploads)
+    avatars_dir = Path("data/avatars")
+    if avatars_dir.exists():
+        for avatar_dir in avatars_dir.iterdir():
+            if avatar_dir.is_dir():
+                visemes_dir = avatar_dir / "visemes"
+                if visemes_dir.exists():
+                    shutil.rmtree(visemes_dir, ignore_errors=True)
+                frame = avatar_dir / "frame.jpg"
+                if frame.exists():
+                    frame.unlink()
+
+    logger.info("Session reset — all media and avatar data cleared")
+    return {"status": "reset", "message": "Session data cleared"}
+
+
+@app.on_event("shutdown")
+async def shutdown_cleanup():
+    """Clean up session data when the server stops."""
+    import shutil
+    media_dir = Path(_config.media_output_dir)
+    if media_dir.exists():
+        for item in media_dir.iterdir():
+            if item.is_dir():
+                shutil.rmtree(item, ignore_errors=True)
+    logger.info("Shutdown cleanup completed")

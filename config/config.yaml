@@ -12,7 +12,7 @@ embedding_model: "all-MiniLM-L6-v2"
 llm_model: "llama3.2:3b"
 llm_base_url: "http://localhost:11434"
 llm_temperature: 0.1
-llm_max_tokens: 512
+llm_max_tokens: 150
 
 # TTS settings
 tts_model_path: "./models/piper/en_US-lessac-medium.onnx"

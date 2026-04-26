@@ -14,9 +14,14 @@ from backend.app.models import GenerationResult, RetrievalResult
 logger = get_logger("llm_service")
 
 _SYSTEM_PROMPT = (
-    "You are a helpful assistant. Answer the user's question using ONLY the "
-    "provided context. If the context does not contain enough information, "
-    "say so clearly. Do not make up facts."
+    "You are a concise factual assistant. Your response will be spoken aloud by an avatar. "
+    "Rules:\n"
+    "- Answer ONLY using facts from the provided context.\n"
+    "- Give ONE short, direct paragraph. Do NOT add a second paragraph.\n"
+    "- Do NOT say 'based on the context' or 'according to the document'.\n"
+    "- Do NOT hedge or qualify. State facts directly.\n"
+    "- Keep your answer under 3 sentences.\n"
+    "- If the context has no relevant info, say 'I don't have information about that in the uploaded document.' and stop."
 )
 
 

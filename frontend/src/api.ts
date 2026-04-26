@@ -2,6 +2,8 @@ export interface AvatarUploadResponse {
   avatar_id: string;
   preview_url: string;
   landmarks_ready: boolean;
+  visemes?: Record<string, string>;
+  frame_url?: string;
 }
 
 export interface PdfUploadResponse {
