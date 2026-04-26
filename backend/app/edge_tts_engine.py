@@ -43,7 +43,21 @@ def generate_edge_tts(text: str, output_path: str, voice: str = VOICE_EN) -> Aud
     """
     try:
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        asyncio.run(_generate_audio_async(text, output_path, voice))
+
+        # Handle both sync and async contexts
+        try:
+            loop = asyncio.get_running_loop()
+            # We're inside an async context — can't use asyncio.run()
+            # Use a new thread to run the coroutine
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                pool.submit(
+                    asyncio.run,
+                    _generate_audio_async(text, output_path, voice)
+                ).result()
+        except RuntimeError:
+            # No running loop — safe to use asyncio.run()
+            asyncio.run(_generate_audio_async(text, output_path, voice))
 
         if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
             logger.error("Edge-TTS produced empty output")
@@ -74,3 +88,20 @@ def _get_mp3_duration(path: str) -> float:
         # Rough estimate: ~128kbps MP3
         size = os.path.getsize(path)
         return max(size / 16000, 0.5)
+
+
+async def generate_edge_tts_async(text: str, output_path: str, voice: str = VOICE_EN) -> AudioResult | None:
+    """Async version of generate_edge_tts for use in async endpoints."""
+    try:
+        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
+        await _generate_audio_async(text, output_path, voice)
+
+        if not os.path.exists(output_path) or os.path.getsize(output_path) == 0:
+            return None
+
+        duration = _get_mp3_duration(output_path)
+        logger.info("Edge-TTS (async): %.2fs audio → %s", duration, output_path)
+        return AudioResult(file_path=output_path, duration_seconds=duration, sample_rate=24000, format="mp3")
+    except Exception as e:
+        logger.error("Edge-TTS async failed: %s", e)
+        return None

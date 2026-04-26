@@ -185,8 +185,8 @@ async def text_to_speech(req: TTSRequest):
 
     # Try Edge-TTS
     try:
-        from backend.app.edge_tts_engine import generate_edge_tts
-        result = generate_edge_tts(req.text, audio_path, voice=req.voice)
+        from backend.app.edge_tts_engine import generate_edge_tts_async
+        result = await generate_edge_tts_async(req.text, audio_path, voice=req.voice)
         if result and os.path.exists(audio_path):
             return FileResponse(
                 audio_path,
@@ -240,8 +240,8 @@ async def generate_video(req: VideoRequest):
     # Step 1: TTS
     audio_mp3 = str(output_dir / "audio.mp3")
     try:
-        from backend.app.edge_tts_engine import generate_edge_tts
-        audio_result = generate_edge_tts(req.text, audio_mp3)
+        from backend.app.edge_tts_engine import generate_edge_tts_async
+        audio_result = await generate_edge_tts_async(req.text, audio_mp3)
         if not audio_result:
             raise RuntimeError("Edge-TTS returned None")
     except Exception as e:

@@ -2,9 +2,24 @@
 
 This document describes the standalone REST API for generating lip-synced avatar audio and video from any edge device. The API runs on your laptop/server and edge devices call it over HTTP.
 
+## Interactive Demo
+
+A visual demo page is included that calls all REST endpoints — no Swagger needed:
+
+**`http://localhost:5173/avatar-demo.html`**
+
+The demo lets you:
+1. Upload a face image → calls `POST /api/avatar/register`
+2. Generate audio from text → calls `POST /api/avatar/tts`
+3. Play viseme lip-sync animation → calls `POST /api/avatar/visemes`
+4. Generate full Wav2Lip video → calls `POST /api/avatar/video`
+
+All interactions use pure HTTP `fetch()` to the REST API — identical to what any edge device client would do.
+
 ## Prerequisites
 
 - AI Gurukul backend running on your laptop: `bash run.sh` or `uvicorn backend.app.main:app --host 0.0.0.0 --port 8000`
+- Frontend dev server running: `cd frontend && npm run dev` (for the demo page)
 - Your laptop and edge device on the same network
 - Find your laptop's IP: `ifconfig | grep "inet "` (use the 192.168.x.x or 10.x.x.x address)
 

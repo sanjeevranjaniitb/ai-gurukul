@@ -149,7 +149,7 @@ export default function ChatInterface({
         )}
         {messages.map((msg, i) => (
           <div key={i} className={`chat-msg chat-msg--${msg.role}`}>
-            <span className="chat-role">{msg.role === 'user' ? 'You' : '🎓 Gurukul'}</span>
+            <span className="chat-role">{msg.role === 'user' ? 'You' : '🎓 AI Gurukul'}</span>
             <p>{msg.content}{msg.role === 'assistant' && processing && i === messages.length - 1 ? '▊' : ''}</p>
             {msg.role === 'assistant' && msg.latency != null && (
               <div className="chat-meta">
