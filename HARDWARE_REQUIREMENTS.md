@@ -7,7 +7,7 @@
 | RAM | 8 GB |
 | CPU | 4-core (x86_64 or ARM64) |
 | Disk | 10 GB free (models ~3.6 GB + Docker layers + runtime data) |
-| OS | Linux (Docker required) |
+| OS | macOS / Linux |
 
 ## Peak Memory Budget
 
@@ -23,10 +23,11 @@
 | Model | Size | Quantization |
 |-------|------|-------------|
 | Llama 3.2 3B | ~2.0 GB | Q4_K_M (INT4) |
-| SadTalker checkpoints | ~1.5 GB | — |
+| Wav2Lip GAN checkpoint | ~416 MB | — |
+| GFPGAN face detection weights | ~300 MB | — |
 | Piper TTS (en_US-lessac-medium) | ~60 MB | ONNX |
 | all-MiniLM-L6-v2 | ~80 MB | — |
-| **Total** | **~3.6 GB** | |
+| **Total** | **~2.9 GB** | |
 
 ## Notes
 

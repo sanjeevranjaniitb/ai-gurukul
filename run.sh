@@ -3,14 +3,16 @@
 # AI Gurukul — Single-command launcher
 # Usage: bash run.sh
 #
-# Creates conda env "ai-gurukul" if needed, starts Ollama, backend,
+# Fully self-bootstrapping: creates .venv if needed, installs Python
+# and Node dependencies, downloads AI models, starts Ollama, backend,
 # and frontend. Cleans up session data on exit.
 # ══════════════════════════════════════════════════════════════════
 
 PROJECT_ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$PROJECT_ROOT"
 
-CONDA_ENV="ai-gurukul"
+VENV_DIR="$PROJECT_ROOT/.venv"
+PYTHON_VERSION="3.10"
 BACKEND_PORT=8000
 FRONTEND_PORT=5173
 BACKEND_PID=""
@@ -57,12 +59,10 @@ echo "🎓 AI Gurukul — Starting up"
 echo "═══════════════════════════════════════════"
 
 # ── 1. Check prerequisites ──
-for cmd in conda node; do
-    if ! command -v "$cmd" &>/dev/null; then
-        err "$cmd not found. Install it first."
-        exit 1
-    fi
-done
+if ! command -v node &>/dev/null; then
+    err "node not found. Install Node.js first (https://nodejs.org)"
+    exit 1
+fi
 
 if ! command -v ollama &>/dev/null; then
     err "ollama not found. Install from https://ollama.com"
@@ -71,34 +71,71 @@ fi
 
 command -v ffmpeg &>/dev/null && log "ffmpeg found" || warn "ffmpeg not found (install with: brew install ffmpeg)"
 
-# ── 2. Conda environment ──
-# Source conda so 'conda activate' works in this script
-CONDA_BASE=$(conda info --base 2>/dev/null)
-if [ -f "$CONDA_BASE/etc/profile.d/conda.sh" ]; then
-    source "$CONDA_BASE/etc/profile.d/conda.sh"
-else
-    err "Cannot find conda.sh — is conda installed correctly?"
+# ── 2. Find Python 3.10 ──
+PYTHON_BIN=""
+for candidate in python3.10 python3 python; do
+    if command -v "$candidate" &>/dev/null; then
+        PY_VER=$("$candidate" --version 2>&1 | grep -oE '[0-9]+\.[0-9]+')
+        if [ "$PY_VER" = "$PYTHON_VERSION" ]; then
+            PYTHON_BIN="$candidate"
+            break
+        fi
+    fi
+done
+
+if [ -z "$PYTHON_BIN" ] && [ -f "$VENV_DIR/bin/python" ]; then
+    # venv already exists, use it even if system python3.10 isn't on PATH
+    PYTHON_BIN="$VENV_DIR/bin/python"
+fi
+
+if [ -z "$PYTHON_BIN" ]; then
+    err "Python $PYTHON_VERSION not found on PATH."
+    err "Install it with: brew install python@3.10  (macOS)"
+    err "              or: sudo apt install python3.10 (Ubuntu)"
     exit 1
 fi
 
-if conda env list 2>/dev/null | grep -qw "$CONDA_ENV"; then
-    log "Conda env '$CONDA_ENV' exists"
+# ── 3. Create virtual environment if needed ──
+if [ ! -f "$VENV_DIR/bin/activate" ]; then
+    info "Creating virtual environment (.venv) with $PYTHON_BIN..."
+    "$PYTHON_BIN" -m venv "$VENV_DIR"
+    log "Virtual environment created"
+    FRESH_VENV=true
 else
-    info "Creating conda env '$CONDA_ENV' (Python 3.10)..."
-    conda env create -f environment.yml -y
-    log "Conda env created"
+    FRESH_VENV=false
 fi
 
-conda activate "$CONDA_ENV"
-log "Activated '$CONDA_ENV' — $(python --version)"
+source "$VENV_DIR/bin/activate"
+log "Activated venv — $(python --version)"
 
-# ── 3. Download AI models ──
+# ── 4. Install Python dependencies ──
+if [ "$FRESH_VENV" = true ] || [ ! -f "$VENV_DIR/.deps_installed" ]; then
+    info "Installing Python dependencies..."
+
+    # Upgrade pip first
+    pip install --upgrade pip --quiet
+
+    # Install main project dependencies
+    pip install -r backend/requirements.txt --quiet
+    log "Backend dependencies installed"
+
+    # Install Wav2Lip runtime dependencies (modern compatible versions)
+    pip install librosa scipy torch torchvision torchaudio --quiet 2>/dev/null
+    log "Wav2Lip dependencies installed"
+
+    # Mark deps as installed so we skip on next run
+    touch "$VENV_DIR/.deps_installed"
+else
+    log "Python dependencies already installed"
+fi
+
+# ── 5. Download AI models ──
 if [ -f scripts/setup_models.sh ]; then
     info "Checking AI models..."
     bash scripts/setup_models.sh 2>&1 | grep -E "^\[" || true
 fi
 
-# ── 4. Ollama + LLM model ──
+# ── 6. Ollama + LLM model ──
 if curl -sf http://localhost:11434/api/tags >/dev/null 2>&1; then
     log "Ollama is running"
 else
@@ -124,7 +161,7 @@ else
     log "LLM pulled"
 fi
 
-# ── 5. Frontend dependencies ──
+# ── 7. Frontend dependencies ──
 if [ ! -d frontend/node_modules ]; then
     info "Installing frontend dependencies..."
     (cd frontend && npm install --silent)
@@ -133,12 +170,12 @@ else
     log "Frontend deps ready"
 fi
 
-# ── 6. Clean previous session data ──
+# ── 8. Clean previous session data ──
 rm -rf data/media/* 2>/dev/null
 rm -rf temp/* 2>/dev/null
 log "Previous session data cleaned"
 
-# ── 7. Start backend ──
+# ── 9. Start backend ──
 info "Starting backend on :${BACKEND_PORT}..."
 python -m uvicorn backend.app.main:app \
     --host 0.0.0.0 --port "$BACKEND_PORT" \
@@ -155,14 +192,14 @@ for i in $(seq 1 30); do
     [ "$i" -eq 30 ] && warn "Backend still loading — it will be ready on first request"
 done
 
-# ── 8. Start frontend ──
+# ── 10. Start frontend ──
 info "Starting frontend on :${FRONTEND_PORT}..."
 (cd frontend && npx vite --port "$FRONTEND_PORT" --host 2>/dev/null) &
 FRONTEND_PID=$!
 sleep 2
 log "Frontend ready at http://localhost:${FRONTEND_PORT}"
 
-# ── 9. Done ──
+# ── 11. Done ──
 echo ""
 echo "═══════════════════════════════════════════"
 echo -e "🎓 ${G}AI Gurukul is ready!${N}"

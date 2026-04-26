@@ -117,7 +117,7 @@ AI Gurukul offers two avatar animation modes, selectable via a dropdown in the U
 | **PDF Parsing** | PyMuPDF | Text + table extraction |
 | **Chunking** | LangChain + tiktoken | 512-token chunks, 50-token overlap |
 | **Evaluation** | RAGAS | Faithfulness, context & answer relevance |
-| **Deployment** | Docker Compose · Conda | Multi-service orchestration |
+| **Deployment** | Docker Compose · venv | Multi-service orchestration |
 
 ---
 
@@ -129,13 +129,15 @@ cd ai-gurukul
 bash run.sh
 ```
 
-The `run.sh` script handles everything:
-1. Creates conda environment `ai-gurukul` (Python 3.10)
-2. Installs all Python and Node.js dependencies
-3. Downloads AI models (~860 MB, one-time)
-4. Starts Ollama and pulls `llama3.2:3b`
-5. Starts backend (port 8000) and frontend (port 5173)
-6. Cleans up on Ctrl+C
+The `run.sh` script is fully self-bootstrapping — on a fresh machine it sets up everything, and on subsequent runs it skips straight to launching:
+
+1. Finds Python 3.10 on your system
+2. Creates a `.venv` virtual environment (if it doesn't exist)
+3. Installs all Python and Node.js dependencies (skipped if already installed)
+4. Downloads AI models (~860 MB, skipped if already present)
+5. Starts Ollama and pulls `llama3.2:3b` (skipped if already running)
+6. Starts backend (port 8000) and frontend (port 5173)
+7. Cleans up on Ctrl+C
 
 Open **`http://localhost:5173`** when ready.
 
@@ -147,7 +149,7 @@ Open **`http://localhost:5173`** when ready.
 
 | Tool | Version | Install (macOS) |
 |------|---------|-----------------|
-| Conda | any | [anaconda.com](https://www.anaconda.com/) or `brew install miniconda` |
+| Python | 3.10 | `brew install python@3.10` |
 | Node.js | 20+ | `brew install node` |
 | Ollama | latest | [ollama.com](https://ollama.com) |
 | ffmpeg | any | `brew install ffmpeg` |
@@ -159,29 +161,34 @@ Open **`http://localhost:5173`** when ready.
 git clone https://github.com/sanjeevranjaniitb/ai-gurukul.git
 cd ai-gurukul
 
-# 2. Create conda environment
-conda env create -f environment.yml
-conda activate ai-gurukul
+# 2. Create virtual environment
+python3.10 -m venv .venv
+source .venv/bin/activate
 
-# 3. Download AI models
+# 3. Install Python dependencies
+pip install --upgrade pip
+pip install -r backend/requirements.txt
+pip install librosa scipy torch torchvision torchaudio
+
+# 4. Download AI models
 bash scripts/setup_models.sh
 
-# 4. Download Wav2Lip checkpoint (~416 MB)
+# 5. Download Wav2Lip checkpoint (~416 MB)
 #    If setup_models.sh didn't get it, download manually from:
 #    https://huggingface.co/tensorbanana/wav2lip/resolve/main/wav2lip_gan.pth
 #    Place at: models/wav2lip/checkpoints/wav2lip_gan.pth
 
-# 5. Install frontend
+# 6. Install frontend
 cd frontend && npm install && cd ..
 
-# 6. Start Ollama + pull model
+# 7. Start Ollama + pull model
 ollama serve &
 ollama pull llama3.2:3b
 
-# 7. Start backend
+# 8. Start backend
 python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
 
-# 8. Start frontend (new terminal)
+# 9. Start frontend (new terminal)
 cd frontend && npm run dev
 ```
 
@@ -230,7 +237,7 @@ Full OpenAPI docs at `/docs` when backend is running.
 ## Running Tests
 
 ```bash
-conda activate ai-gurukul
+source .venv/bin/activate
 
 # Backend tests (170+ tests)
 python -m pytest backend/app/ -v
@@ -301,8 +308,7 @@ ai-gurukul/
 │   └── package.json
 ├── models/wav2lip/              # Wav2Lip model + checkpoints
 ├── config/config.yaml           # Application configuration
-├── environment.yml              # Conda environment spec
-├── run.sh                       # Single-command launcher
+├── run.sh                       # Single-command launcher (auto-creates .venv)
 ├── scripts/setup_models.sh      # Model download script
 ├── docker-compose.yml           # Docker deployment
 └── LICENSES.md                  # Open-source license manifest
@@ -327,7 +333,7 @@ ai-gurukul/
 | Problem | Solution |
 |---------|----------|
 | Lip sync not working | Verify `models/wav2lip/checkpoints/wav2lip_gan.pth` is ~416 MB (not a text file). Re-download from HuggingFace if needed. |
-| `ModuleNotFoundError` | Use `conda activate ai-gurukul` or `.venv/bin/python` — system Python doesn't have dependencies |
+| `ModuleNotFoundError` | Run `source .venv/bin/activate` first — system Python doesn't have the project dependencies |
 | Backend slow on first request | Models load lazily. First avatar upload takes ~15s to load Wav2Lip. |
 | `Cannot connect to Ollama` | Run `ollama serve` first. Check with `curl http://localhost:11434/api/tags` |
 | Frontend can't reach backend | Vite proxies `/api` to `localhost:8000`. Make sure backend is running on port 8000. |

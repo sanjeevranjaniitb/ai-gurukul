@@ -48,4 +48,4 @@ All models and libraries used in this project are open-source. No paid API keys 
 | Nginx | BSD-2-Clause |
 | Ollama | MIT |
 | Node.js | MIT |
-| Python | PSF License |
+| Python (venv) | PSF License |
