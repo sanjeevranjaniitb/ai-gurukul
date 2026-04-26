@@ -126,8 +126,8 @@ function App() {
                   onChange={(e) => setLipSyncMode(e.target.value as LipSyncMode)}
                   disabled={processing}
                 >
-                  <option value="animated">⚡ Animated Lip Sync</option>
-                  <option value="real">🎬 Real Lip Sync</option>
+                  <option value="animated">Animated Lip Sync</option>
+                  <option value="real">Real Lip Sync</option>
                 </select>
               </div>
 

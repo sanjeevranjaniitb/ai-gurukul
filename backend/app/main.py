@@ -63,6 +63,10 @@ Path("data/avatars").mkdir(parents=True, exist_ok=True)
 Path("data/documents").mkdir(parents=True, exist_ok=True)
 app.mount("/api/data", StaticFiles(directory=str(_data_dir)), name="data")
 
+# Mount avatar generation API for edge devices
+from backend.app.avatar_api import router as avatar_router
+app.include_router(avatar_router)
+
 # ---------------------------------------------------------------------------
 # Request / response schemas
 # ---------------------------------------------------------------------------
