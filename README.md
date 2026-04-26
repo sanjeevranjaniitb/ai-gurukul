@@ -1,7 +1,3 @@
-<p align="center">
-  <img src="frontend/src/assets/hero.png" alt="AI Gurukul" width="120" />
-</p>
-
 <h1 align="center">🎓 AI Gurukul</h1>
 
 <p align="center">
