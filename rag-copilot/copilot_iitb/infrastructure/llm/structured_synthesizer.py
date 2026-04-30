@@ -14,7 +14,16 @@ _STREAM_FORMAT_ADDON = (
     "\n\nSTREAMING FORMAT (this turn only):\n"
     "- Ignore any requirement to output JSON.\n"
     "- Reply in plain language or markdown only. Ground claims only in the provided evidence.\n"
-    "- If evidence is insufficient or conflicting, say so clearly in prose.\n"
+    "- If the student explicitly asks for a one-liner, short answer only, one sentence, or similar, comply—skip roadmap "
+    "sections and stay brief.\n"
+    "- Otherwise stream in this order (headings ok):\n"
+    "  (1) **Teaching plan** — numbered outline of how you will explain before you teach.\n"
+    "  (2) **Lesson** — follow that plan step by step in sequence (clear paragraphs/sentences; label steps to match the plan).\n"
+    "  (3) **Study plan** — numbered mastery/practice steps from the materials.\n"
+    "  (4) Optional recap/self-check; then an engaging next-step question if helpful.\n"
+    "- If evidence supports only part of a chapter-style question, still deliver the full plan→lesson→study flow for "
+    "what is supported; mention gaps briefly at the end—do not open with \"partial information\" hedges.\n"
+    "- If evidence is truly insufficient or conflicting, say so clearly in prose.\n"
 )
 
 
