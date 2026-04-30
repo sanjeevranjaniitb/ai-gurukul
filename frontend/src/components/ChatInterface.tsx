@@ -20,6 +20,7 @@ interface Props {
   onStageUpdate?: (stage: string) => void;
   onProcessingChange?: (processing: boolean) => void;
   onNewQuery?: () => void;
+  onQAComplete?: (question: string, answer: string) => void;
   onReplay?: (audioUrl: string, sentence: string, duration: number, videoUrl?: string) => void;
 }
 
@@ -31,6 +32,7 @@ export default function ChatInterface({
   onStageUpdate,
   onProcessingChange,
   onNewQuery,
+  onQAComplete,
   onReplay,
 }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -38,6 +40,11 @@ export default function ChatInterface({
   const [processing, setProcessing] = useState(false);
   const historyRef = useRef<HTMLDivElement>(null);
   const { ask } = useSSE();
+
+  // Session cache: normalized question → cached answer
+  const cacheRef = useRef<Map<string, { answer: string; audioUrl: string; sentence: string; duration: number; videoUrl: string }>>(new Map());
+
+  const normalizeQuestion = (q: string) => q.trim().toLowerCase().replace(/[?.!,]+$/g, '').replace(/\s+/g, ' ');
 
   useEffect(() => {
     if (historyRef.current) {
@@ -62,6 +69,34 @@ export default function ChatInterface({
     setInput('');
     onNewQuery?.();
     setMessages((prev) => [...prev, { role: 'user', content: question }]);
+
+    // Check session cache
+    const key = normalizeQuestion(question);
+    const cached = cacheRef.current.get(key);
+    if (cached) {
+      const cachedContent = `🔄 You Already Asked This\n\n${cached.answer}`;
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: cachedContent,
+          latency: 0,
+          audioUrl: cached.audioUrl,
+          sentence: cached.sentence || cached.answer,
+          audioDuration: cached.duration,
+          videoUrl: cached.videoUrl,
+        },
+      ]);
+      // Replay the cached audio/video
+      if (cached.audioUrl) {
+        onAudioChunk?.(cached.audioUrl, 0, cached.sentence || cached.answer, cached.duration);
+      }
+      if (cached.videoUrl) {
+        onVideoChunk?.(cached.videoUrl);
+      }
+      return;
+    }
+
     setProcessing(true);
     onProcessingChange?.(true);
 
@@ -113,6 +148,17 @@ export default function ChatInterface({
         });
         setProcessing(false);
         onProcessingChange?.(false);
+        if (assistantText) {
+          // Cache the response
+          cacheRef.current.set(key, {
+            answer: assistantText,
+            audioUrl: lastAudioUrl,
+            sentence: lastSentence || assistantText,
+            duration: lastDuration,
+            videoUrl: lastVideoUrl,
+          });
+          onQAComplete?.(question, assistantText);
+        }
       },
       onError(msg) {
         const latency = (performance.now() - startTime) / 1000;

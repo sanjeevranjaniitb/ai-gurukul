@@ -1,10 +1,12 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import AvatarUpload from './components/AvatarUpload';
 import PdfUpload from './components/PdfUpload';
 import ChatInterface from './components/ChatInterface';
 import AvatarPlayer from './components/AvatarPlayer';
 import RealVideoPlayer from './components/RealVideoPlayer';
 import ProcessingIndicator from './components/ProcessingIndicator';
+import RollingQuizBanner from './components/RollingQuizBanner';
+import DocQuizModal from './components/DocQuizModal';
 import type { AvatarUploadResponse, PdfUploadResponse } from './api';
 import './App.css';
 
@@ -20,7 +22,7 @@ function App() {
   const [avatarId, setAvatarId] = useState<string | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [visemes, setVisemes] = useState<Record<string, string>>({});
-  const [, setDocId] = useState<string | null>(null);
+  const [docId, setDocId] = useState<string | null>(null);
   const [docName, setDocName] = useState<string | null>(null);
   const [audioQueue, setAudioQueue] = useState<AudioChunkData[]>([]);
   const [videoQueue, setVideoQueue] = useState<string[]>([]);
@@ -28,6 +30,11 @@ function App() {
   const [processing, setProcessing] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [lipSyncMode, setLipSyncMode] = useState<LipSyncMode>('animated');
+
+  // Quiz state
+  const [qaHistory, setQaHistory] = useState<Array<{ question: string; answer: string }>>([]);
+  const [showDocQuiz, setShowDocQuiz] = useState(false);
+  const sessionQuizTrigger = useRef<(() => void) | null>(null);
 
   const handleAvatarUploaded = useCallback((data: AvatarUploadResponse) => {
     setAvatarId(data.avatar_id);
@@ -63,6 +70,10 @@ function App() {
     setSidebarOpen(false);
   }, []);
 
+  const handleQAComplete = useCallback((question: string, answer: string) => {
+    setQaHistory((prev) => [...prev, { question, answer }]);
+  }, []);
+
   const handleSegmentEnd = useCallback(() => {}, []);
 
   // Replay: clear queue first, then set the replay item on next tick
@@ -96,6 +107,28 @@ function App() {
           </button>
           <h1>🎓 AI Gurukul</h1>
           <span className="header-tagline">Talk to your documents through a living avatar</span>
+
+          {/* Quiz buttons — right side of header */}
+          <div className="header-quiz-buttons">
+            {docId && (
+              <button
+                className="header-quiz-btn header-quiz-btn--doc header-quiz-btn--flash"
+                onClick={() => setShowDocQuiz(true)}
+                aria-label="Test Document Knowledge"
+              >
+                📄 Test Document Knowledge
+              </button>
+            )}
+            {qaHistory.length > 0 && (
+              <button
+                className="header-quiz-btn header-quiz-btn--session header-quiz-btn--flash"
+                onClick={() => sessionQuizTrigger.current?.()}
+                aria-label="Quiz Your Understanding"
+              >
+                🧠 Quiz Your Understanding
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -156,6 +189,9 @@ function App() {
             </div>
 
             <div className="chat-column">
+              {/* Rolling quiz overlay (no inline button — triggered from header) */}
+              <RollingQuizBanner qaHistory={qaHistory} triggerRef={sessionQuizTrigger} />
+
               <ChatInterface
                 avatarId={avatarId}
                 lipSyncMode={lipSyncMode}
@@ -164,12 +200,22 @@ function App() {
                 onStageUpdate={handleStageUpdate}
                 onProcessingChange={handleProcessingChange}
                 onNewQuery={handleNewQuery}
+                onQAComplete={handleQAComplete}
                 onReplay={handleReplay}
               />
             </div>
           </div>
         </main>
       </div>
+
+      {/* Document quiz modal */}
+      {showDocQuiz && docId && (
+        <DocQuizModal
+          documentId={docId}
+          documentName={docName || 'Document'}
+          onClose={() => setShowDocQuiz(false)}
+        />
+      )}
     </div>
   );
 }

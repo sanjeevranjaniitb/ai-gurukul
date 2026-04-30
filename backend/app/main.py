@@ -67,6 +67,10 @@ app.mount("/api/data", StaticFiles(directory=str(_data_dir)), name="data")
 from backend.app.avatar_api import router as avatar_router
 app.include_router(avatar_router)
 
+# Mount quiz generation API for session knowledge quizzes
+from backend.app.quiz_module import router as quiz_router
+app.include_router(quiz_router)
+
 # ---------------------------------------------------------------------------
 # Request / response schemas
 # ---------------------------------------------------------------------------
