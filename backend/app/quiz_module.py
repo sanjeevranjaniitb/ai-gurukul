@@ -271,6 +271,16 @@ _config = load_config()
 _OLLAMA_URL = _config.llm_base_url.rstrip("/") + "/api/generate"
 _OLLAMA_MODEL = _config.llm_model
 
+# Session cache: avoids repeated LLM calls for the same quiz
+# Key: cache_key (doc_id or hash of qa_history) → QuizResponse
+_quiz_cache: dict[str, QuizResponse] = {}
+
+
+def clear_quiz_cache() -> None:
+    """Clear all cached quiz responses. Called on session reset."""
+    _quiz_cache.clear()
+    logger.info("Quiz cache cleared")
+
 
 def _call_ollama_raw(prompt: str, num_predict: int = 2048) -> str:
     """Call Ollama directly with a raw prompt (no system prompt wrapping).
@@ -309,10 +319,18 @@ def _call_ollama_raw(prompt: str, num_predict: int = 2048) -> str:
 async def generate_quiz(body: QuizRequest) -> QuizResponse:
     """Generate MCQ questions from session Q&A history.
 
-    Returns a QuizResponse with a UUID quiz_id and a list of validated questions.
-    - HTTP 503 when the LLM is unreachable or times out
-    - HTTP 502 when the LLM output cannot be parsed into valid questions
+    Returns cached response if the same Q&A history was already quizzed.
     """
+    import hashlib
+
+    # Build cache key from Q&A history content
+    history_str = "|".join(f"{p.question}:{p.answer}" for p in body.qa_history)
+    cache_key = "session:" + hashlib.md5(history_str.encode()).hexdigest()
+
+    if cache_key in _quiz_cache:
+        logger.info("Returning cached session quiz for key %s", cache_key[:20])
+        return _quiz_cache[cache_key]
+
     # Step 1: Build the quiz generation prompt
     prompt = build_quiz_prompt(body.qa_history, body.num_questions)
 
@@ -340,11 +358,10 @@ async def generate_quiz(body: QuizRequest) -> QuizResponse:
             detail="Failed to generate valid quiz questions. Please try again.",
         )
 
-    # Step 5: Return structured response
-    return QuizResponse(
-        quiz_id=str(uuid.uuid4()),
-        questions=questions,
-    )
+    # Step 5: Cache and return
+    response = QuizResponse(quiz_id=str(uuid.uuid4()), questions=questions)
+    _quiz_cache[cache_key] = response
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -401,9 +418,14 @@ def build_doc_quiz_prompt(doc_text: str, num_questions: int) -> str:
 async def generate_doc_quiz(body: DocQuizRequest) -> QuizResponse:
     """Generate MCQ questions from uploaded document content.
 
-    Retrieves document chunks from ChromaDB and generates quiz questions
-    covering the key concepts in the document.
+    Returns cached response if the same document was already quizzed.
     """
+    cache_key = f"doc:{body.document_id}:{body.num_questions}"
+
+    if cache_key in _quiz_cache:
+        logger.info("Returning cached doc quiz for %s", body.document_id[:12])
+        return _quiz_cache[cache_key]
+
     # Step 1: Get document chunks
     chunks = _get_document_chunks(body.document_id)
     if not chunks:
@@ -417,14 +439,13 @@ async def generate_doc_quiz(body: DocQuizRequest) -> QuizResponse:
     if len(doc_text) > 6000:
         doc_text = doc_text[:6000]
 
-    # Step 2: Generate questions in batches to avoid truncation
-    # For 10 questions, generate in batches of 3-4
+    # Step 2: Generate questions in 2 batches of 5 to avoid truncation
     all_questions: list[QuizQuestion] = []
     remaining = body.num_questions
     batch_num = 0
 
-    while remaining > 0 and batch_num < 5:  # max 5 attempts
-        batch_size = min(remaining, 3)
+    while remaining > 0 and batch_num < 3:  # max 3 attempts
+        batch_size = min(remaining, 5)
         prompt = build_doc_quiz_prompt(doc_text, batch_size)
 
         raw_text = _call_ollama_raw(prompt, num_predict=4096)
@@ -452,7 +473,9 @@ async def generate_doc_quiz(body: DocQuizRequest) -> QuizResponse:
             detail="Failed to generate quiz from document. Please try again.",
         )
 
-    return QuizResponse(
+    response = QuizResponse(
         quiz_id=str(uuid.uuid4()),
         questions=all_questions[:body.num_questions],
     )
+    _quiz_cache[cache_key] = response
+    return response

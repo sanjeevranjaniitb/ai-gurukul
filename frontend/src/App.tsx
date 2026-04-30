@@ -7,7 +7,8 @@ import RealVideoPlayer from './components/RealVideoPlayer';
 import ProcessingIndicator from './components/ProcessingIndicator';
 import RollingQuizBanner from './components/RollingQuizBanner';
 import DocQuizModal from './components/DocQuizModal';
-import type { AvatarUploadResponse, PdfUploadResponse } from './api';
+import type { AvatarUploadResponse, PdfUploadResponse, QuizGenerateResponse } from './api';
+import { generateDocQuiz } from './api';
 import './App.css';
 
 export type LipSyncMode = 'animated' | 'real';
@@ -35,6 +36,8 @@ function App() {
   const [qaHistory, setQaHistory] = useState<Array<{ question: string; answer: string }>>([]);
   const [showDocQuiz, setShowDocQuiz] = useState(false);
   const sessionQuizTrigger = useRef<(() => void) | null>(null);
+  const [preloadedDocQuiz, setPreloadedDocQuiz] = useState<QuizGenerateResponse | null>(null);
+  const [docQuizLoading, setDocQuizLoading] = useState(false);
 
   const handleAvatarUploaded = useCallback((data: AvatarUploadResponse) => {
     setAvatarId(data.avatar_id);
@@ -45,6 +48,17 @@ function App() {
   const handlePdfUploaded = useCallback((data: PdfUploadResponse) => {
     setDocId(data.document_id);
     setDocName(data.name);
+    // Pre-generate document quiz in background
+    setPreloadedDocQuiz(null);
+    setDocQuizLoading(true);
+    generateDocQuiz(data.document_id, 10)
+      .then((resp) => {
+        setPreloadedDocQuiz(resp);
+        setDocQuizLoading(false);
+      })
+      .catch(() => {
+        setDocQuizLoading(false);
+      });
   }, []);
 
   const handleAudioChunk = useCallback((url: string, _index: number, sentence: string, duration: number) => {
@@ -73,6 +87,8 @@ function App() {
   const handleQAComplete = useCallback((question: string, answer: string) => {
     setQaHistory((prev) => [...prev, { question, answer }]);
   }, []);
+
+  const handleCloseDocQuiz = useCallback(() => setShowDocQuiz(false), []);
 
   const handleSegmentEnd = useCallback(() => {}, []);
 
@@ -105,27 +121,28 @@ function App() {
           >
             {sidebarOpen ? '◀' : '▶'}
           </button>
-          <h1>🎓 AI Gurukul</h1>
+          <h1 style={{ cursor: 'pointer' }} onClick={() => window.location.reload()}>🎓 AI Gurukul</h1>
           <span className="header-tagline">Talk to your documents through a living avatar</span>
 
           {/* Quiz buttons — right side of header */}
           <div className="header-quiz-buttons">
             {docId && (
               <button
-                className="header-quiz-btn header-quiz-btn--doc header-quiz-btn--flash"
+                className={`header-quiz-btn header-quiz-btn--doc ${preloadedDocQuiz ? 'header-quiz-btn--flash' : ''}`}
                 onClick={() => setShowDocQuiz(true)}
+                disabled={docQuizLoading}
                 aria-label="Test Document Knowledge"
               >
-                📄 Test Document Knowledge
+                {docQuizLoading ? 'Preparing Quiz…' : preloadedDocQuiz ? 'Test Document Knowledge' : 'Test Document Knowledge'}
               </button>
             )}
             {qaHistory.length > 0 && (
               <button
                 className="header-quiz-btn header-quiz-btn--session header-quiz-btn--flash"
                 onClick={() => sessionQuizTrigger.current?.()}
-                aria-label="Quiz Your Understanding"
+                aria-label="Quiz Your Current Understanding"
               >
-                🧠 Quiz Your Understanding
+                Quiz Your Current Understanding
               </button>
             )}
           </div>
@@ -213,7 +230,8 @@ function App() {
         <DocQuizModal
           documentId={docId}
           documentName={docName || 'Document'}
-          onClose={() => setShowDocQuiz(false)}
+          onClose={handleCloseDocQuiz}
+          preloadedQuiz={preloadedDocQuiz}
         />
       )}
     </div>

@@ -1,24 +1,36 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { generateDocQuiz } from '../api';
-import type { QuizQuestion } from '../api';
+import type { QuizQuestion, QuizGenerateResponse } from '../api';
 
 interface DocQuizModalProps {
   documentId: string;
   documentName: string;
   onClose: () => void;
+  preloadedQuiz?: QuizGenerateResponse | null;
 }
 
 type AnswerState = { selected: number; isCorrect: boolean } | null;
 
-export default function DocQuizModal({ documentId, documentName, onClose }: DocQuizModalProps) {
+export default function DocQuizModal({ documentId, documentName, onClose, preloadedQuiz }: DocQuizModalProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [questions, setQuestions] = useState<QuizQuestion[]>([]);
   const [answers, setAnswers] = useState<Map<number, AnswerState>>(new Map());
   const [score, setScore] = useState(0);
   const [totalAnswered, setTotalAnswered] = useState(0);
+  const fetchedRef = useRef(false);
 
   const fetchQuiz = useCallback(async () => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+
+    // Use preloaded data if available
+    if (preloadedQuiz && preloadedQuiz.questions.length > 0) {
+      setQuestions(preloadedQuiz.questions);
+      setLoading(false);
+      return;
+    }
+
     setLoading(true);
     setError('');
     try {
@@ -32,7 +44,7 @@ export default function DocQuizModal({ documentId, documentName, onClose }: DocQ
     } finally {
       setLoading(false);
     }
-  }, [documentId]);
+  }, [documentId, preloadedQuiz]);
 
   useEffect(() => { fetchQuiz(); }, [fetchQuiz]);
 

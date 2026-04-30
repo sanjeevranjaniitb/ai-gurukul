@@ -334,6 +334,10 @@ async def reset_session():
                 if frame.exists():
                     frame.unlink()
 
+    # Clear quiz cache
+    from backend.app.quiz_module import clear_quiz_cache
+    clear_quiz_cache()
+
     logger.info("Session reset — all media and avatar data cleared")
     return {"status": "reset", "message": "Session data cleared"}
 

@@ -1,17 +1,37 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 
-// Character → viseme name mapping
+// Character → viseme name mapping (20 visemes for near-phoneme-level animation)
 const CHAR_TO_VISEME: Record<string, string> = {
-  a: 'a', h: 'a', r: 'a', l: 'a',
-  e: 'e', i: 'e', y: 'e', s: 'e', z: 'e', j: 'e',
-  o: 'o', u: 'o', w: 'o', q: 'o',
-  m: 'm', b: 'm', p: 'm', f: 'm', v: 'm',
-  t: 'a', d: 'a', n: 'a', k: 'a', g: 'a', c: 'a', x: 'a',
+  // Vowels
+  a: 'ah', h: 'ah',
+  e: 'eh', 
+  i: 'ih',
+  o: 'oh',
+  u: 'oo', q: 'oo',
+  // Bilabial
+  m: 'mm', b: 'bv', p: 'mm',
+  // Labiodental
+  f: 'ff', v: 'ff',
+  // Dental / alveolar
+  t: 'td', d: 'td',
+  n: 'nn',
+  l: 'll',
+  // Sibilant
+  s: 'ss', z: 'ss',
+  j: 'sh', c: 'sh', x: 'sh',
+  // Velar / glottal
+  k: 'kk', g: 'kk',
+  // Approximants
+  w: 'ww',
+  r: 'rr',
+  y: 'ee',
+  // Silence / punctuation
   ' ': 'idle', '.': 'idle', ',': 'idle', '?': 'idle', '!': 'idle',
+  '\n': 'idle', '-': 'idle', "'": 'idle',
 };
 
 function getVisemeForChar(char: string): string {
-  return CHAR_TO_VISEME[char.toLowerCase()] || 'a';
+  return CHAR_TO_VISEME[char.toLowerCase()] || 'ae';
 }
 
 export interface AudioChunkData {
@@ -36,6 +56,7 @@ export default function AvatarPlayer({ avatarPreview, visemes, audioQueue, onSeg
   const loadedImagesRef = useRef<Record<string, HTMLImageElement>>({});
   const [isAnimating, setIsAnimating] = useState(false);
   const [canvasReady, setCanvasReady] = useState(false);
+  const [segmentTrigger, setSegmentTrigger] = useState(0);
 
   // Load all viseme images into HTMLImageElement objects for canvas drawing
   useEffect(() => {
@@ -83,8 +104,8 @@ export default function AvatarPlayer({ avatarPreview, visemes, audioQueue, onSeg
     const img = loadedImagesRef.current[visemeName] || loadedImagesRef.current['idle'];
     if (!img) return;
 
-    // Clear and draw
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Draw directly without clearing — avoids flash of background color
+    // between frames. drawImage at full canvas size covers all pixels.
     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
   }, []);
 
@@ -99,7 +120,6 @@ export default function AvatarPlayer({ avatarPreview, visemes, audioQueue, onSeg
         if (!canvas) return;
         const ctx = canvas.getContext('2d');
         if (!ctx) return;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
       };
       img.src = avatarPreview;
@@ -124,15 +144,23 @@ export default function AvatarPlayer({ avatarPreview, visemes, audioQueue, onSeg
     audio.load();
 
     const text = segment.sentence;
-    const dur = segment.duration || 3;
-    const charSpeed = text.length > 0 ? text.length / dur : 14;
+    let animStopped = false;
 
-    const runAnimation = () => {
+    const startAnimation = () => {
       setIsAnimating(true);
-      const t0 = performance.now();
 
       const tick = () => {
-        const elapsed = (performance.now() - t0) / 1000;
+        if (animStopped) return;
+
+        // Check if audio has ended or paused — stop immediately
+        if (audio.ended || audio.paused) {
+          drawFrame('idle');
+          return;
+        }
+
+        const audioDur = audio.duration || segment.duration || 3;
+        const elapsed = audio.currentTime || 0;
+        const charSpeed = text.length > 0 ? text.length / audioDur : 14;
         const ci = Math.min(Math.floor(elapsed * charSpeed), text.length - 1);
 
         if (ci >= 0 && ci < text.length) {
@@ -140,41 +168,65 @@ export default function AvatarPlayer({ avatarPreview, visemes, audioQueue, onSeg
           drawFrame(visemeName);
         }
 
-        if (elapsed < dur) {
-          animRef.current = requestAnimationFrame(tick);
-        }
+        animRef.current = requestAnimationFrame(tick);
       };
       animRef.current = requestAnimationFrame(tick);
     };
 
-    const onEnded = () => {
+    const cleanup = () => {
+      animStopped = true;
       cancelAnimationFrame(animRef.current);
       drawFrame('idle');
       playingRef.current = false;
       setIsAnimating(idxRef.current < audioQueue.length);
       onSegmentEnd();
+      setSegmentTrigger((prev) => prev + 1);
     };
 
-    audio.onended = onEnded;
+    audio.onended = cleanup;
+    audio.onpause = () => {
+      // Also stop on pause (covers edge cases)
+      animStopped = true;
+      cancelAnimationFrame(animRef.current);
+      drawFrame('idle');
+    };
     audio.onerror = () => {
+      animStopped = true;
+      cancelAnimationFrame(animRef.current);
       playingRef.current = false;
       setIsAnimating(false);
       drawFrame('idle');
     };
 
     audio.play()
-      .then(runAnimation)
+      .then(startAnimation)
       .catch(() => {
         audio.muted = true;
         audio.play()
-          .then(runAnimation)
+          .then(startAnimation)
           .catch(() => {
-            // Can't play audio — still animate visually
-            runAnimation();
-            setTimeout(onEnded, dur * 1000);
+            // Can't play audio at all — animate with timer fallback
+            setIsAnimating(true);
+            const dur = segment.duration || 3;
+            const t0 = performance.now();
+            const fallbackTick = () => {
+              if (animStopped) return;
+              const elapsed = (performance.now() - t0) / 1000;
+              const charSpeed = text.length > 0 ? text.length / dur : 14;
+              const ci = Math.min(Math.floor(elapsed * charSpeed), text.length - 1);
+              if (ci >= 0 && ci < text.length) {
+                drawFrame(getVisemeForChar(text[ci]));
+              }
+              if (elapsed < dur) {
+                animRef.current = requestAnimationFrame(fallbackTick);
+              } else {
+                cleanup();
+              }
+            };
+            animRef.current = requestAnimationFrame(fallbackTick);
           });
       });
-  }, [audioQueue.length, canvasReady, drawFrame, onSegmentEnd]);
+  }, [audioQueue.length, canvasReady, drawFrame, onSegmentEnd, segmentTrigger]);
 
   // Reset when queue is cleared
   useEffect(() => {

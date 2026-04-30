@@ -177,11 +177,35 @@ class VisemeEngine:
         face_roi = img[y1:y2, x1:x2]
         face_96 = cv2.resize(face_roi, (96, 96))
 
+        # 20 distinct viseme mel spectrograms for near-phoneme-level animation.
+        # Each pattern drives Wav2Lip to produce a unique mouth shape.
         viseme_mels = {
-            'a': np.ones((80, 16), dtype=np.float32) * 2.5,
-            'e': self._mel(high_freq=True),
-            'o': self._mel(low_freq=True),
-            'm': np.ones((80, 16), dtype=np.float32) * -4.0,
+            # Open vowels
+            'ah':    np.ones((80, 16), dtype=np.float32) * 2.5,                    # wide open (father)
+            'ae':    np.ones((80, 16), dtype=np.float32) * 1.8,                    # half open (cat)
+            'eh':    self._mel_band(40, 70, 2.5),                                  # mid open (bed)
+            'ee':    self._mel(high_freq=True),                                     # spread smile (see)
+            'ih':    self._mel_band(50, 80, 1.5),                                  # slight smile (sit)
+            'oh':    self._mel(low_freq=True),                                      # rounded (go)
+            'oo':    self._mel_band(0, 15, 4.0),                                   # tight round (boot)
+            'uh':    self._mel_band(5, 30, 2.0),                                   # relaxed round (book)
+            # Consonants — bilabial
+            'mm':    np.ones((80, 16), dtype=np.float32) * -4.0,                   # closed (m, b, p)
+            'bv':    np.ones((80, 16), dtype=np.float32) * -2.5,                   # near-closed (b release)
+            # Consonants — labiodental
+            'ff':    np.ones((80, 16), dtype=np.float32) * -2.0,                   # lower lip tuck (f, v)
+            # Consonants — dental/alveolar
+            'th':    np.ones((80, 16), dtype=np.float32) * 0.5,                    # tongue tip (th)
+            'td':    self._mel_band(15, 45, 1.2),                                  # alveolar stop (t, d)
+            'nn':    self._mel_band(20, 50, 0.8),                                  # nasal (n)
+            'll':    self._mel_band(25, 55, 1.0),                                  # lateral (l)
+            # Consonants — sibilant
+            'ss':    self._mel_band(55, 80, 2.5),                                  # hiss (s, z)
+            'sh':    self._mel_band(30, 60, 2.0),                                  # postalveolar (sh, ch, j)
+            # Consonants — velar/glottal
+            'kk':    self._mel_band(10, 40, 1.5),                                  # velar (k, g)
+            'ww':    self._mel_band(0, 20, 3.5),                                   # labial approx (w)
+            'rr':    self._mel_band(15, 35, 2.8),                                  # retroflex (r)
         }
 
         result = {}
@@ -205,11 +229,26 @@ class VisemeEngine:
                 pred_np = pred.cpu().numpy().transpose(0, 2, 3, 1) * 255.0
                 pred_bgr = cv2.cvtColor(pred_np[0].astype(np.uint8), cv2.COLOR_RGB2BGR)
 
+                # Suppress blue channel bias from Wav2Lip — clamp B channel
+                # to not exceed the average of R and G channels per pixel
+                b, g, r = cv2.split(pred_bgr)
+                rg_avg = ((r.astype(np.int16) + g.astype(np.int16)) // 2).astype(np.uint8)
+                b = np.minimum(b, rg_avg + 5)  # allow only tiny blue excess
+                pred_bgr = cv2.merge([b, g, r])
+
                 target_h = y2 - y1
                 target_w = x2 - x1
                 pred_up = cv2.resize(pred_bgr, (target_w, target_h), interpolation=cv2.INTER_LANCZOS4)
 
-                final = self._seamless_blend(img, pred_up, x1, y1, target_w, target_h)
+                # Only use the lower half of the Wav2Lip prediction (mouth area).
+                # The upper half contains the masked input (black/blue pixels)
+                # which would leak through as a blue square artifact.
+                # Composite: keep original face for upper half, Wav2Lip for lower half.
+                composite = face_roi.copy()
+                blend_start = target_h // 2  # start from midpoint of face
+                composite[blend_start:, :] = pred_up[blend_start:, :]
+
+                final = self._seamless_blend(img, composite, x1, y1, target_w, target_h)
 
                 out_path = os.path.join(output_dir, f"{name}.jpg")
                 cv2.imwrite(out_path, final, [cv2.IMWRITE_JPEG_QUALITY, 95])
@@ -222,33 +261,70 @@ class VisemeEngine:
         return result
 
     def _seamless_blend(self, original, patch, x1, y1, tw, th):
-        """Poisson seamless cloning for artifact-free blending."""
-        mask = np.zeros(patch.shape, patch.dtype)
-        cx, cy = tw // 2, int(th * 0.75)
-        ax, ay = int(tw * 0.45), int(th * 0.25)
-        cv2.ellipse(mask, (cx, cy), (ax, ay), 0, 0, 360, (255, 255, 255), -1)
+        """Blend Wav2Lip mouth onto original using luminance-only transfer.
 
-        ih, iw = original.shape[:2]
-        pc = (
-            max(ax + 1, min(iw - ax - 1, x1 + cx)),
-            max(ay + 1, min(ih - ay - 1, y1 + cy)),
-        )
+        Takes ONLY the shape/shadow (luminance) from Wav2Lip and keeps
+        the color 100% from the original face. Uses a very tight lip mask
+        with heavy feathering to avoid visible patch boundaries.
+        """
+        # Only blend the lower 35% of the face (tight lip region)
+        mouth_top = int(th * 0.62)
+        mouth_h = th - mouth_top
 
+        mouth_patch = patch[mouth_top:, :]
+        mouth_orig = original[y1 + mouth_top:y1 + th, x1:x1 + tw]
+
+        if mouth_orig.shape != mouth_patch.shape or mouth_orig.size == 0:
+            return original.copy()
+
+        # Luminance-only transfer:
+        # L channel from Wav2Lip (mouth shape), A/B from original (skin color)
         try:
-            return cv2.seamlessClone(patch, original, mask, pc, cv2.NORMAL_CLONE)
-        except cv2.error:
-            result = original.copy()
-            alpha = mask.astype(np.float32) / 255.0
-            roi = result[y1:y1 + th, x1:x1 + tw]
-            if roi.shape == patch.shape:
-                result[y1:y1 + th, x1:x1 + tw] = (alpha * patch + (1 - alpha) * roi).astype(np.uint8)
-            return result
+            orig_lab = cv2.cvtColor(mouth_orig, cv2.COLOR_BGR2LAB).astype(np.float32)
+            patch_lab = cv2.cvtColor(mouth_patch, cv2.COLOR_BGR2LAB).astype(np.float32)
+
+            # Blend luminance: 80% Wav2Lip + 20% original for softer transition
+            merged_l = patch_lab[:, :, 0] * 0.8 + orig_lab[:, :, 0] * 0.2
+
+            merged = orig_lab.copy()
+            merged[:, :, 0] = merged_l
+            mouth_patch = cv2.cvtColor(np.clip(merged, 0, 255).astype(np.uint8), cv2.COLOR_LAB2BGR)
+        except Exception:
+            pass
+
+        # Very tight elliptical mask centered on lips with heavy feathering
+        mask = np.zeros((mouth_h, tw), dtype=np.float32)
+        cx = tw // 2
+        cy = int(mouth_h * 0.4)  # slightly above center (lips are upper part of this region)
+        ax = int(tw * 0.32)      # narrow width — just the lips
+        ay = int(mouth_h * 0.45) # short height
+        cv2.ellipse(mask, (cx, cy), (ax, ay), 0, 0, 360, 1.0, -1)
+
+        # Heavy Gaussian blur for invisible edges
+        ksize = max(31, (min(tw, mouth_h) // 2) | 1)
+        mask = cv2.GaussianBlur(mask, (ksize, ksize), ksize // 2.5)
+        mask3 = np.stack([mask] * 3, axis=-1)
+
+        # Alpha blend
+        result = original.copy()
+        blended = (mask3 * mouth_patch.astype(np.float32) +
+                   (1 - mask3) * mouth_orig.astype(np.float32))
+        result[y1 + mouth_top:y1 + th, x1:x1 + tw] = blended.astype(np.uint8)
+
+        return result
 
     @staticmethod
     def _mel(low_freq=False, high_freq=False):
         mel = np.zeros((80, 16), dtype=np.float32)
         if low_freq: mel[:25, :] = 3.0
         if high_freq: mel[55:, :] = 3.0
+        return mel
+
+    @staticmethod
+    def _mel_band(start: int, end: int, value: float):
+        """Generate a mel spectrogram with energy in a specific frequency band."""
+        mel = np.zeros((80, 16), dtype=np.float32)
+        mel[start:end, :] = value
         return mel
 
     # ------------------------------------------------------------------
