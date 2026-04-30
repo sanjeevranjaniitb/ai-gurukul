@@ -293,6 +293,8 @@ Open **`http://localhost:5173`**.
 
 ## API Reference
 
+### Core Endpoints
+
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | `POST` | `/api/upload/avatar` | Upload avatar image → returns viseme data |
@@ -302,6 +304,18 @@ Open **`http://localhost:5173`**.
 | `POST` | `/api/quiz/generate-from-doc` | Generate MCQs from uploaded document content |
 | `POST` | `/api/reset` | Clear all session data |
 | `GET` | `/api/health` | Health check with memory usage |
+
+### Avatar Generation API (Edge Device)
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| `POST` | `/api/avatar/register` | Register a face image → returns avatar_id + visemes |
+| `POST` | `/api/avatar/tts` | Text-to-speech → returns MP3 audio |
+| `POST` | `/api/avatar/video` | Generate lip-synced MP4 video from text |
+| `POST` | `/api/avatar/visemes` | Get 20 pre-generated viseme images (base64) |
+| `GET` | `/api/avatar/list` | List all registered avatars |
+
+See [AVATAR_API.md](AVATAR_API.md) for detailed edge device integration guide with examples.
 
 ### SSE Event Types (from `/api/ask`)
 

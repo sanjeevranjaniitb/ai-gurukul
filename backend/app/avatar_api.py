@@ -295,8 +295,8 @@ async def generate_video(req: VideoRequest):
 async def get_visemes(req: VisemeRequest):
     """Return base64-encoded viseme images for client-side lip-sync animation.
 
-    Returns 5 images: idle, a, e, o, m — each as a JPEG data URL.
-    The edge device can swap between these in sync with audio playback.
+    Returns 21 images (idle + 20 phoneme visemes) as JPEG data URLs.
+    The edge device swaps between these at 60fps in sync with audio playback.
     """
     avatar = _registered_avatars.get(req.avatar_id)
     if not avatar:
@@ -316,11 +316,17 @@ async def get_visemes(req: VisemeRequest):
         "avatar_id": req.avatar_id,
         "visemes": viseme_data,
         "char_to_viseme": {
-            'a': 'a', 'h': 'a', 'r': 'a', 'l': 'a',
-            'e': 'e', 'i': 'e', 'y': 'e', 's': 'e', 'z': 'e',
-            'o': 'o', 'u': 'o', 'w': 'o', 'q': 'o',
-            'm': 'm', 'b': 'm', 'p': 'm', 'f': 'm', 'v': 'm',
+            'a': 'ah', 'h': 'ah',
+            'e': 'eh', 'i': 'ih',
+            'o': 'oh', 'u': 'oo', 'q': 'oo',
+            'm': 'mm', 'b': 'bv', 'p': 'mm',
+            'f': 'ff', 'v': 'ff',
+            't': 'td', 'd': 'td', 'n': 'nn', 'l': 'll',
+            's': 'ss', 'z': 'ss', 'j': 'sh', 'c': 'sh', 'x': 'sh',
+            'k': 'kk', 'g': 'kk',
+            'w': 'ww', 'r': 'rr', 'y': 'ee',
             ' ': 'idle', '.': 'idle', ',': 'idle',
+            '?': 'idle', '!': 'idle',
         },
     }
 

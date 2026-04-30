@@ -29,13 +29,32 @@ Replace `LAPTOP_IP` in all examples below with your actual IP (e.g., `192.168.1.
 
 ## API Overview
 
+### Avatar Generation (Edge Device)
+
 | Endpoint | Method | Purpose | Latency |
 |----------|--------|---------|---------|
 | `/api/avatar/register` | POST | Upload and register an avatar face image | ~1-15s (first load) |
 | `/api/avatar/tts` | POST | Convert text to speech audio (MP3) | ~1-2s |
 | `/api/avatar/video` | POST | Generate lip-synced video from text (MP4) | ~20-30s |
-| `/api/avatar/visemes` | POST | Get viseme images for client-side animation | <1s |
+| `/api/avatar/visemes` | POST | Get 20 pre-generated viseme images (base64) | <1s |
 | `/api/avatar/list` | GET | List all registered avatars | <1s |
+
+### Quiz Generation
+
+| Endpoint | Method | Purpose | Latency |
+|----------|--------|---------|---------|
+| `/api/quiz/generate` | POST | Generate MCQs from session Q&A history | ~5-15s |
+| `/api/quiz/generate-from-doc` | POST | Generate MCQs from uploaded document content | ~30-60s |
+
+### Core Application
+
+| Endpoint | Method | Purpose | Latency |
+|----------|--------|---------|---------|
+| `/api/upload/avatar` | POST | Upload avatar for the web UI | ~1-15s |
+| `/api/upload/pdf` | POST | Upload PDF → parse, chunk, embed | ~2-10s |
+| `/api/ask` | POST | Ask question → SSE stream | ~3-8s |
+| `/api/health` | GET | Health check with memory usage | <1s |
+| `/api/reset` | POST | Clear all session data | <1s |
 
 ---
 
@@ -54,7 +73,7 @@ curl -X POST http://LAPTOP_IP:8000/api/avatar/register \
 {
     "avatar_id": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
     "frame_url": "/api/data/avatars/a1b2c3d4-.../frame.jpg",
-    "viseme_count": 5,
+    "viseme_count": 20,
     "duration_ms": 1250.3
 }
 ```
@@ -146,20 +165,67 @@ curl -X POST http://LAPTOP_IP:8000/api/avatar/visemes \
     "avatar_id": "a1b2c3d4-...",
     "visemes": {
         "idle": "data:image/jpeg;base64,/9j/4AAQ...",
-        "a": "data:image/jpeg;base64,/9j/4AAQ...",
-        "e": "data:image/jpeg;base64,/9j/4AAQ...",
-        "o": "data:image/jpeg;base64,/9j/4AAQ...",
-        "m": "data:image/jpeg;base64,/9j/4AAQ..."
+        "ah": "data:image/jpeg;base64,...",
+        "ae": "data:image/jpeg;base64,...",
+        "eh": "data:image/jpeg;base64,...",
+        "ee": "data:image/jpeg;base64,...",
+        "ih": "data:image/jpeg;base64,...",
+        "oh": "data:image/jpeg;base64,...",
+        "oo": "data:image/jpeg;base64,...",
+        "uh": "data:image/jpeg;base64,...",
+        "mm": "data:image/jpeg;base64,...",
+        "bv": "data:image/jpeg;base64,...",
+        "ff": "data:image/jpeg;base64,...",
+        "th": "data:image/jpeg;base64,...",
+        "td": "data:image/jpeg;base64,...",
+        "nn": "data:image/jpeg;base64,...",
+        "ll": "data:image/jpeg;base64,...",
+        "ss": "data:image/jpeg;base64,...",
+        "sh": "data:image/jpeg;base64,...",
+        "kk": "data:image/jpeg;base64,...",
+        "ww": "data:image/jpeg;base64,...",
+        "rr": "data:image/jpeg;base64,..."
     },
     "char_to_viseme": {
-        "a": "a", "h": "a", "r": "a",
-        "e": "e", "i": "e", "s": "e",
-        "o": "o", "u": "o", "w": "o",
-        "m": "m", "b": "m", "p": "m",
+        "a": "ah", "h": "ah",
+        "e": "eh", "i": "ih",
+        "o": "oh", "u": "oo", "q": "oo",
+        "m": "mm", "b": "bv", "p": "mm",
+        "f": "ff", "v": "ff",
+        "t": "td", "d": "td", "n": "nn", "l": "ll",
+        "s": "ss", "z": "ss", "j": "sh", "c": "sh", "x": "sh",
+        "k": "kk", "g": "kk",
+        "w": "ww", "r": "rr", "y": "ee",
         " ": "idle", ".": "idle", ",": "idle"
     }
 }
 ```
+
+**20 viseme phoneme groups:**
+
+| Viseme | Mouth Shape | Letters |
+|--------|------------|---------|
+| `idle` | Neutral/closed | spaces, punctuation |
+| `ah` | Wide open | a, h |
+| `ae` | Half open | (default fallback) |
+| `eh` | Mid open | e |
+| `ee` | Spread smile | y |
+| `ih` | Slight smile | i |
+| `oh` | Rounded | o |
+| `oo` | Tight round | u, q |
+| `uh` | Relaxed round | (variant) |
+| `mm` | Closed lips | m, p |
+| `bv` | Near-closed | b |
+| `ff` | Lower lip tuck | f, v |
+| `th` | Tongue tip | (th sound) |
+| `td` | Alveolar stop | t, d |
+| `nn` | Nasal | n |
+| `ll` | Lateral | l |
+| `ss` | Hiss | s, z |
+| `sh` | Postalveolar | j, c, x |
+| `kk` | Velar | k, g |
+| `ww` | Pursed | w |
+| `rr` | Retroflex | r |
 
 **Client-side animation algorithm:**
 ```python
@@ -169,8 +235,8 @@ import time
 # 1. Get audio + visemes
 audio = call_tts_api(text)
 visemes = call_visemes_api(avatar_id)
-images = decode_base64_images(visemes["visemes"])
-char_map = visemes["char_to_viseme"]
+images = decode_base64_images(visemes["visemes"])  # 20 viseme images
+char_map = visemes["char_to_viseme"]  # char → viseme name
 
 # 2. Play audio and animate simultaneously
 audio_duration = get_duration(audio)
@@ -179,18 +245,18 @@ char_speed = len(text) / audio_duration  # chars per second
 play_audio(audio)
 start_time = time.time()
 
-while (time.time() - start_time) < audio_duration:
+while audio_is_playing():
     elapsed = time.time() - start_time
     char_idx = int(elapsed * char_speed)
     
     if char_idx < len(text):
         char = text[char_idx].lower()
-        viseme_name = char_map.get(char, "a")
+        viseme_name = char_map.get(char, "ae")  # default: half-open
         display_image(images[viseme_name])
     
-    time.sleep(0.05)  # 20 FPS
+    time.sleep(1/60)  # 60 FPS for smooth animation
 
-display_image(images["idle"])  # Reset to idle
+display_image(images["idle"])  # Reset to idle when audio ends
 ```
 
 ---
@@ -261,7 +327,7 @@ resp = requests.post(f"{SERVER}/api/avatar/visemes", json={"avatar_id": avatar_i
 data = resp.json()
 visemes = data["visemes"]       # {name: "data:image/jpeg;base64,..."}
 char_map = data["char_to_viseme"]  # {char: viseme_name}
-print(f"Got {len(visemes)} viseme images")
+print(f"Got {len(visemes)} viseme images")  # Should be 20+idle
 
 # Play audio + animate visemes (pseudocode — adapt to your display)
 # See the animation algorithm above
