@@ -79,7 +79,7 @@ class OpenAIRetrievalPlanner(IRetrievalPlanner):
 
 
 def build_retrieval_planner(settings: Settings) -> IRetrievalPlanner:
-    if not settings.enable_reasoning_retrieval:
+    if settings.document_assistant_mode or not settings.enable_reasoning_retrieval:
         return NoOpRetrievalPlanner()
     if settings.llm_provider == "azure_openai":
         return OpenAIRetrievalPlanner(settings)

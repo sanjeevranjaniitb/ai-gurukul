@@ -29,7 +29,13 @@ class EmbeddingCosineReranker(IReranker):
         self._settings = settings
         self._embed = embed
 
-    async def arerank(self, query: str, chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
+    async def arerank(
+        self,
+        query: str,
+        chunks: list[RetrievedChunk],
+        *,
+        query_embedding: list[float] | None = None,
+    ) -> list[RetrievedChunk]:
         if not chunks:
             return []
         lim = self._settings.rerank_chunk_char_limit
@@ -39,9 +45,13 @@ class EmbeddingCosineReranker(IReranker):
             if len(t) > lim:
                 t = t[:lim]
             chunk_texts.append(t)
-        vecs = await self._embed.aembed_texts([query, *chunk_texts])
-        qv = vecs[0]
-        cvecs = vecs[1:]
+        if query_embedding is not None:
+            qv = query_embedding
+            cvecs = await self._embed.aembed_texts(chunk_texts)
+        else:
+            vecs = await self._embed.aembed_texts([query, *chunk_texts])
+            qv = vecs[0]
+            cvecs = vecs[1:]
         scored: list[tuple[float, RetrievedChunk]] = []
         for c, cv in zip(chunks, cvecs):
             s = _cosine_sim(qv, cv)

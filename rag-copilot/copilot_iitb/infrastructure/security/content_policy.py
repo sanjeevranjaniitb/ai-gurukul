@@ -34,3 +34,8 @@ def evaluate_input_policy(settings: Settings, text: str) -> PolicyResult:
                 # Misconfigured regex should not hard-block all traffic; skip this check.
                 pass
     return PolicyResult(allowed=True)
+
+
+async def aevaluate_input_policy(settings: Settings, text: str) -> PolicyResult:
+    """Async entry point for the chat pipeline (same rules as :func:`evaluate_input_policy`)."""
+    return evaluate_input_policy(settings, text)

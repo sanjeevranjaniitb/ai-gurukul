@@ -147,6 +147,32 @@ class Settings(BaseSettings):
         description="Chroma Cloud database name when using cloud (CHROMA_DATABASE).",
     )
 
+    document_assistant_mode: bool = Field(
+        default=True,
+        description=(
+            "Fast document Q&A: skip LLM query rewrite (use user text as search query), skip embedding rerank, "
+            "tighten merge/synthesis caps, and cap final answer tokens. Set DOCUMENT_ASSISTANT_MODE=false for the full multi-LLM pipeline."
+        ),
+    )
+    rag_synthesis_max_output_tokens: int = Field(
+        default=512,
+        ge=64,
+        le=4096,
+        description="Max completion tokens for the final RAG answer (lower = faster; RAG_SYNTHESIS_MAX_OUTPUT_TOKENS).",
+    )
+    rag_synthesis_timeout_seconds: float = Field(
+        default=45.0,
+        ge=3.0,
+        le=300.0,
+        description="HTTP timeout for the final RAG chat completion only (RAG_SYNTHESIS_TIMEOUT_SECONDS).",
+    )
+    chat_slow_turn_warning_ms: float = Field(
+        default=1000.0,
+        ge=100.0,
+        le=120_000.0,
+        description="Emit a WARNING log when a chat turn exceeds this wall time (ms), including remote LLM.",
+    )
+
     retrieval_top_k: int = Field(default=8, ge=1, le=50)
     fusion_top_k: int = Field(
         default=5,
@@ -244,7 +270,7 @@ class Settings(BaseSettings):
     query_rewrite_max_variants: int = Field(default=3, ge=1, le=8)
 
     enable_reasoning_retrieval: bool = Field(
-        default=True,
+        default=False,
         description="When true and an LLM is configured, run a bounded CoT planner for extra vector searches.",
     )
     reasoning_max_iterations: int = Field(default=3, ge=0, le=8)
@@ -265,7 +291,7 @@ class Settings(BaseSettings):
     )
     greeting_max_message_chars: int = Field(default=160, ge=8, le=500)
     greeting_response: str = Field(
-        default="Hello! I am your IITB knowledge copilot. Ask me a question about the indexed documents.",
+        default="Hello! I am your document assistant. Ask a question about your indexed documents.",
         description="Assistant reply for greeting short-circuit (GREETING_RESPONSE).",
     )
 
@@ -348,6 +374,13 @@ class Settings(BaseSettings):
         """Single Chroma collection: CHROMA_INDEX_NAME wins over CHROMA_COLLECTION when set."""
         if self.chroma_index_name is not None and str(self.chroma_index_name).strip():
             object.__setattr__(self, "chroma_collection", str(self.chroma_index_name).strip())
+        return self
+
+    @model_validator(mode="after")
+    def _document_assistant_fusion_top_k(self) -> Settings:
+        """Smaller vector candidate pool when ``document_assistant_mode`` is on (faster embed + Chroma work)."""
+        if self.document_assistant_mode:
+            object.__setattr__(self, "fusion_top_k", min(int(self.fusion_top_k), 5))
         return self
 
     @model_validator(mode="after")

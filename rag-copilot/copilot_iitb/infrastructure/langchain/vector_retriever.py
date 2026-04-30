@@ -11,7 +11,14 @@ from copilot_iitb.core.interfaces.retrieval import IRetriever, IReranker, Retrie
 
 
 class NoOpReranker(IReranker):
-    async def arerank(self, query: str, chunks: list[RetrievedChunk]) -> list[RetrievedChunk]:
+    async def arerank(
+        self,
+        query: str,
+        chunks: list[RetrievedChunk],
+        *,
+        query_embedding: list[float] | None = None,
+    ) -> list[RetrievedChunk]:
+        _ = query, query_embedding
         return list(chunks)
 
 
@@ -137,4 +144,4 @@ class LangChainVectorRetriever(IRetriever):
         except Exception as e:
             raise e
                
-        return await self._reranker.arerank(query, chunks)
+        return await self._reranker.arerank(query, chunks, query_embedding=query_embedding)

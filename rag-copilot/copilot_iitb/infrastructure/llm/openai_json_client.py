@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 from typing import Any
 
@@ -8,11 +9,35 @@ from openai import APIConnectionError, APIError, APITimeoutError, AsyncAzureOpen
 
 from copilot_iitb.config.settings import Settings
 
+# Reuse HTTP clients across JSON helper calls (query rewrite, planner, etc.) to avoid TLS
+# and connection setup on every chat turn.
+_oai_json_clients: dict[str, tuple[AsyncOpenAI | AsyncAzureOpenAI, str]] = {}
+
+
+def _secret_fingerprint(value: str | None) -> str:
+    if not value:
+        return ""
+    return hashlib.sha256(value.encode("utf-8")).hexdigest()[:24]
+
+
+def _json_client_cache_key(settings: Settings) -> str:
+    if settings.llm_provider == "azure_openai":
+        return (
+            "azure|"
+            f"{settings.azure_openai_endpoint}|{settings.azure_openai_api_version}|"
+            f"{settings.azure_openai_chat_deployment or ''}|{_secret_fingerprint(settings.azure_openai_api_key)}"
+        )
+    return f"openai|{_secret_fingerprint(settings.openai_api_key)}|{settings.openai_model}"
+
 
 def build_async_openai_client(settings: Settings) -> tuple[AsyncOpenAI | AsyncAzureOpenAI, str]:
     """Return (client, chat_model_or_deployment_name)."""
+    cache_key = _json_client_cache_key(settings)
+    cached = _oai_json_clients.get(cache_key)
+    if cached is not None:
+        return cached
     if settings.llm_provider == "azure_openai":
-        return (
+        pair = (
             AsyncAzureOpenAI(
                 azure_endpoint=settings.azure_openai_endpoint,
                 api_version=settings.azure_openai_api_version,
@@ -20,9 +45,12 @@ def build_async_openai_client(settings: Settings) -> tuple[AsyncOpenAI | AsyncAz
             ),
             settings.azure_openai_chat_deployment or "",
         )
-    if not settings.openai_api_key:
+    elif not settings.openai_api_key:
         raise ValueError("OpenAI API key is required for this operation when LLM_PROVIDER=openai.")
-    return AsyncOpenAI(api_key=settings.openai_api_key), settings.openai_model
+    else:
+        pair = (AsyncOpenAI(api_key=settings.openai_api_key), settings.openai_model)
+    _oai_json_clients[cache_key] = pair
+    return pair
 
 
 def _is_retriable_openai_error(exc: BaseException) -> bool:

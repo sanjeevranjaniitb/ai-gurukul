@@ -1,13 +1,17 @@
-"""HTTP surface for conversational RAG (``POST /v1/chat``).
+"""HTTP surface for conversational RAG (``POST /v1/chat``, ``POST /v1/chat/stream``).
 
-Why this module exists: FastAPI should stay thin—validate transport concerns
-(rate limits, HTTP errors) and delegate all chat semantics to
-:class:`copilot_iitb.application.chat_service.ChatService`.
+FastAPI stays thin: rate limits, HTTP mapping, and delegation to
+:class:`copilot_iitb.application.chat_service.ChatService`, which forwards to
+:class:`copilot_iitb.application.chat_agent.ChatAgent` (timed pipeline: guardrails,
+retrieval plan, index retrieval, chunk selection, answer generation).
 """
 
 from __future__ import annotations
 
+import json
+
 from fastapi import APIRouter, HTTPException, Request
+from fastapi.responses import StreamingResponse
 
 from copilot_iitb.agent_debug_log import agent_debug_log
 from copilot_iitb.api.container import AppContainer
@@ -27,7 +31,8 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
     Operation:
         1. Enforce per-client rate limits (abuse protection).
         2. Resolve the wired :class:`~copilot_iitb.api.container.AppContainer` and
-           call :meth:`copilot_iitb.application.chat_service.ChatService.handle_chat`.
+           call :meth:`copilot_iitb.application.chat_service.ChatService.handle_chat`
+           (runs :class:`~copilot_iitb.application.chat_agent.ChatAgent`).
         3. Map domain ``ValueError`` (e.g. unknown ``session_id``) to HTTP 400.
 
     Args:
@@ -83,3 +88,50 @@ async def chat(request: Request, body: ChatRequest) -> ChatResponse:
         )
         # #endregion
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.post("/chat/stream")
+async def chat_stream(request: Request, body: ChatRequest) -> StreamingResponse:
+    """Same pipeline as ``POST /v1/chat``, but SSE after retrieval (token deltas for synthesis).
+
+    Events (each SSE ``data:`` line is one JSON object):
+
+    - ``{"type":"meta","session_id":"...","retrieval_debug":{...}}`` — sent before
+      generation when the model will stream (use ``session_id`` for follow-ups).
+    - ``{"type":"delta","text":"..."}`` — zero or more answer fragments (synthesis path).
+    - ``{"type":"done","session_id":"...","result":{...},"retrieval_debug":{...}}`` —
+      final payload; ``result`` matches :class:`~copilot_iitb.domain.models.RAGAnswer`.
+
+    Short-circuit paths (policy block, greeting, no chunks, weak evidence) emit only
+    ``done`` (no ``meta``/``delta``).
+    """
+    limiter: InMemoryRateLimiter = request.app.state.limiter
+    limiter.check(client_key(request))
+
+    container: AppContainer = request.app.state.container
+
+    stream = container.chat_service.handle_chat_stream(body)
+    stream_iter = stream.__aiter__()
+    try:
+        first_event = await stream_iter.__anext__()
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    async def event_source():
+        yield f"data: {json.dumps(first_event, default=str)}\n\n"
+        while True:
+            try:
+                ev = await stream_iter.__anext__()
+            except StopAsyncIteration:
+                break
+            yield f"data: {json.dumps(ev, default=str)}\n\n"
+
+    return StreamingResponse(
+        event_source(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )

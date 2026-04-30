@@ -47,9 +47,10 @@ async def lifespan(app: FastAPI):
         vectorstore=vectorstore,
         embedding_provider=embed_provider,
     )
+    use_embedding_rerank = settings.enable_embedding_rerank and not settings.document_assistant_mode
     reranker = (
         EmbeddingCosineReranker(settings, embed_provider)
-        if settings.enable_embedding_rerank
+        if use_embedding_rerank
         else NoOpReranker()
     )
     retriever = LangChainVectorRetriever(
@@ -64,7 +65,7 @@ async def lifespan(app: FastAPI):
     synthesizer = build_synthesizer(settings)
     query_rewriter = build_query_rewriter(settings)
     retrieval_planner = build_retrieval_planner(settings)
-    # Chat pipeline: shared retriever + memory + LLM ports (see ChatService docstring).
+    # Chat pipeline: ChatService → ChatAgent (guardrails, plan, retrieve, select, generate).
     chat_service = ChatService(
         settings=settings,
         sessions=sessions_repo,

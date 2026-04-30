@@ -79,6 +79,8 @@ class OpenAIQueryRewriter(IQueryRewriter):
 
 
 def build_query_rewriter(settings: Settings) -> IQueryRewriter:
+    if settings.document_assistant_mode:
+        return HeuristicQueryRewriter()
     if not settings.enable_query_rewrite:
         return HeuristicQueryRewriter()
     if settings.llm_provider == "azure_openai":

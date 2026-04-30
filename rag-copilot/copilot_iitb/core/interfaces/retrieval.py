@@ -21,5 +21,16 @@ class IRetriever(ABC):
 
 class IReranker(ABC):
     @abstractmethod
-    async def arerank(self, query: str, chunks: Sequence[RetrievedChunk]) -> list[RetrievedChunk]:
+    async def arerank(
+        self,
+        query: str,
+        chunks: Sequence[RetrievedChunk],
+        *,
+        query_embedding: list[float] | None = None,
+    ) -> list[RetrievedChunk]:
+        """Rerank ``chunks`` for ``query``.
+
+        When ``query_embedding`` is supplied (e.g. same vector used for vector search),
+        implementers should avoid re-embedding the query to save latency and API cost.
+        """
         raise NotImplementedError

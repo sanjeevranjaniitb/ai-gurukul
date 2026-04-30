@@ -20,3 +20,7 @@ class InputGuard:
         if len(cleaned) > max_len:
             cleaned = cleaned[:max_len]
         return SanitizedText(cleaned)
+
+    async def asanitize_user_message(self, text: str, *, max_len: int = 16_000) -> SanitizedText:
+        """Async entry point for the chat pipeline (same work as :meth:`sanitize_user_message`)."""
+        return self.sanitize_user_message(text, max_len=max_len)
