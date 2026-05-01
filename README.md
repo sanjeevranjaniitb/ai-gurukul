@@ -141,27 +141,27 @@ Document Chunks      ──→  Doc Prompt   ──→  Llama 3.2 3B  ──→ 
 │  │ Sidebar  │  │  Canvas  │  │   Chat   │  │  Quiz Panel/Modal   │  │
 │  │ (upload) │  │ (avatar) │  │ (stream) │  │  (doc + session)    │  │
 │  └──────────┘  └──────────┘  └──────────┘  └─────────────────────┘  │
-│                    Session Cache (Map<question, response>)           │
+│                    Session Cache (Map<question, response>)          │
 └────────────────────────┬────────────────────────────────────────────┘
                          │ SSE + REST
                          ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                     FastAPI Backend                                  │
+│                     FastAPI Backend                                 │
 │                                                                     │
 │  ┌─────────────────── Orchestrator ──────────────────────────────┐  │
-│  │  Animated: Retrieve → Stream LLM → Edge-TTS → viseme canvas  │  │
-│  │  Real:     Retrieve → Stream LLM → Edge-TTS → Wav2Lip video  │  │
+│  │  Animated: Retrieve → Stream LLM → Edge-TTS → viseme canvas   │  │
+│  │  Real:     Retrieve → Stream LLM → Edge-TTS → Wav2Lip video   │  │
 │  └───────────────────────────────────────────────────────────────┘  │
 │                                                                     │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐    │
-│  │PDF Parser│  │Embedding │  │  Viseme  │  │  Quiz Module     │    │
-│  │(PyMuPDF) │  │  Store   │  │  Engine  │  │  (LLM → JSON)   │    │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────────────┘    │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐     │
+│  │PDF Parser│  │Embedding │  │  Viseme  │  │  Quiz Module     │     │
+│  │(PyMuPDF) │  │  Store   │  │  Engine  │  │  (LLM → JSON)    │     │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────────────┘     │
 │                                                                     │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐    │
-│  │LLM Svc  │  │Edge-TTS  │  │Wav2Lip   │  │  Evaluation      │    │
-│  │(Ollama)  │  │(Neural)  │  │(GAN)     │  │  (RAGAS)         │    │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────────────┘    │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────────────┐     │
+│  │LLM Svc  │   │Edge-TTS  │  │ Wav2Lip  │  │   Evaluation     │     │ 
+│  │(Ollama)  │  │(Neural)  │  │(GAN)     │  │  (RAGAS)         │     │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────────────┘     │
 └─────────────────────────────────────────────────────────────────────┘
          │              │              │
          ▼              ▼              ▼
@@ -214,6 +214,100 @@ The `run.sh` script is fully self-bootstrapping — on a fresh machine it sets u
 7. Cleans up on Ctrl+C
 
 Open **`http://localhost:5173`** when ready.
+
+### API-Only Mode (for edge devices)
+
+If you only need the backend API (no web UI):
+
+```bash
+bash start_api.sh        # default port 8000
+bash start_api.sh 9000   # custom port
+```
+
+Also fully self-bootstrapping — creates venv, installs all Python dependencies, downloads AI models, starts Ollama, and launches the API server. Only prerequisites: Python 3.10 and Ollama installed.
+
+This exposes all endpoints on `0.0.0.0`, accessible from any device on your network. See [AVATAR_API.md](AVATAR_API.md) for the full edge device integration guide.
+
+---
+
+## Rendering Viseme Animation on Edge Devices
+
+The API returns 20 pre-generated viseme images (base64 JPEG) and a character-to-viseme mapping. Here's how to render lip-sync animation in your own application:
+
+### 1. Get the viseme images and mapping
+
+```bash
+# Register avatar once
+AVATAR_ID=$(curl -s -X POST http://SERVER_IP:8000/api/avatar/register \
+    -F "file=@face.jpg" | python3 -c "import sys,json; print(json.load(sys.stdin)['avatar_id'])")
+
+# Get viseme images (base64) + char mapping
+curl -s -X POST http://SERVER_IP:8000/api/avatar/visemes \
+    -H "Content-Type: application/json" \
+    -d "{\"avatar_id\": \"$AVATAR_ID\"}" > visemes.json
+```
+
+The response contains:
+- `visemes` — 21 base64-encoded JPEG images (`idle` + 20 phoneme shapes)
+- `char_to_viseme` — mapping from each alphabet character to its viseme name
+
+### 2. Generate audio
+
+```bash
+curl -s -X POST http://SERVER_IP:8000/api/avatar/tts \
+    -H "Content-Type: application/json" \
+    -d '{"text": "Your text here"}' -o speech.mp3
+```
+
+### 3. Animate in your app
+
+The animation algorithm works on any platform (Python, JavaScript, Swift, C++, etc.):
+
+```python
+# Python example — adapt to your display framework
+import json, base64, time
+from io import BytesIO
+from PIL import Image  # or cv2, pygame, tkinter, etc.
+
+# Load viseme data
+with open("visemes.json") as f:
+    data = json.load(f)
+
+# Decode base64 images into your framework's image format
+images = {}
+for name, b64_url in data["visemes"].items():
+    b64_data = b64_url.split(",")[1]  # strip "data:image/jpeg;base64,"
+    images[name] = Image.open(BytesIO(base64.b64decode(b64_data)))
+
+char_map = data["char_to_viseme"]
+
+# Animate: loop through text characters synced to audio
+text = "Your text here"
+audio_duration = 3.5  # seconds (from TTS response header X-Duration-Seconds)
+char_speed = len(text) / audio_duration
+
+play_audio("speech.mp3")
+start = time.time()
+
+while time.time() - start < audio_duration:
+    elapsed = time.time() - start
+    char_idx = min(int(elapsed * char_speed), len(text) - 1)
+    char = text[char_idx].lower()
+    viseme_name = char_map.get(char, "ae")  # default: half-open mouth
+    display(images[viseme_name])            # render to screen/canvas
+    time.sleep(1/60)                        # 60 FPS
+
+display(images["idle"])  # return to neutral face
+```
+
+### Key points for your implementation
+
+- **Frame rate**: 60 FPS gives smooth animation. 30 FPS is acceptable.
+- **Sync to audio**: Always derive the character position from actual audio playback time, not a separate timer. This keeps lips in sync even if audio buffers.
+- **Stop exactly with audio**: Check if audio has ended every frame. Draw `idle` immediately when audio stops.
+- **20 viseme phoneme groups**: Each covers a distinct mouth shape. The `char_to_viseme` mapping handles the letter-to-phoneme conversion.
+- **Preload images**: Decode all 21 base64 images into memory before starting animation. Don't decode per-frame.
+- **Transitions**: For even smoother results, cross-fade between consecutive viseme frames over 2-3 frames instead of hard-swapping.
 
 ---
 

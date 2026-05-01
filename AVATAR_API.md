@@ -18,12 +18,37 @@ All interactions use pure HTTP `fetch()` to the REST API — identical to what a
 
 ## Prerequisites
 
-- AI Gurukul backend running on your laptop: `bash run.sh` or `uvicorn backend.app.main:app --host 0.0.0.0 --port 8000`
-- Frontend dev server running: `cd frontend && npm run dev` (for the demo page)
+- AI Gurukul backend running on your laptop/server
 - Your laptop and edge device on the same network
 - Find your laptop's IP: `ifconfig | grep "inet "` (use the 192.168.x.x or 10.x.x.x address)
 
 Replace `LAPTOP_IP` in all examples below with your actual IP (e.g., `192.168.1.42`).
+
+### Quick Start (API only — no frontend needed)
+
+```bash
+# Start the API server (backend only, accessible from any device on the network)
+bash start_api.sh
+
+# Or with a custom port
+bash start_api.sh 9000
+```
+
+The script activates the venv, starts Ollama + LLM, launches the API server on `0.0.0.0`, and prints your network IP with ready-to-copy curl commands.
+
+### Full Application (with web UI)
+
+```bash
+# Start everything — backend + frontend
+bash run.sh
+```
+
+### Manual Start
+
+```bash
+source .venv/bin/activate
+python -m uvicorn backend.app.main:app --host 0.0.0.0 --port 8000
+```
 
 ---
 
